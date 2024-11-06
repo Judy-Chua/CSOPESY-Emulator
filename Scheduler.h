@@ -6,10 +6,11 @@
 #include <vector>
 #include <string>
 #include <condition_variable>
+#include "MemoryManager.h"
 
 class Scheduler {
 public:
-    Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay);
+    Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay, int memMax, int memFrame, int memProc);
     void addProcess(std::shared_ptr<Process> process);
     void startScheduling();
     void generateProcesses();
@@ -30,8 +31,9 @@ private:
     void workerRR(int coreId, std::shared_ptr<Process> process);
     int countAvailCoresRR();
     int countAvailCores();
-
-    void printProcessQueue(const std::queue<std::shared_ptr<Process>>& processQueue);
+    
+    // useless?
+    //void printProcessQueue(const std::queue<std::shared_ptr<Process>>& processQueue);
 
     std::thread schedulerThread;
     std::thread generateProcessThread;
@@ -49,7 +51,7 @@ private:
 
     int numCores;
     int timeSlice = 0;
-    int minIns, maxIns, batchFreq, delaysPerExec;
+    int minIns, maxIns, batchFreq, delaysPerExec, maxOverallMem, memPerFrame, memPerProc;
 };
 
 

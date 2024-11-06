@@ -9,7 +9,7 @@
 #include <fstream>
 #include <vector>
 #include <thread>
-#include <mutex>   
+#include <mutex>
 
 
 MainConsole::MainConsole() : AConsole("MAIN_CONSOLE"), x(1) {}
@@ -46,7 +46,6 @@ void MainConsole::process() {
     executeCommand(command, userInput);
 }
 
-
 MainConsole::Command MainConsole::getCommand(const std::string& input) const {
     std::istringstream iss(input);
     std::string word;
@@ -64,7 +63,6 @@ MainConsole::Command MainConsole::getCommand(const std::string& input) const {
     else return CMD_INVALID;
 }
 
-
 struct Config {
     int numCpu = 4;
     std::string scheduler = "rr";
@@ -73,6 +71,11 @@ struct Config {
     int minIns = 1000;
     int maxIns = 2000;
     int delayPerExec = 0;
+    int maxOverallMem = 2;
+    int memPerFrame = 2;
+    int memPerProc = 4096; // CHANGE AFTER THE ACTIVITY
+    int minMemPerProc = 2;
+    int maxMemPerProc = 2;
 };
 
 Config readConfig(const std::string& filename) {
@@ -93,29 +96,39 @@ Config readConfig(const std::string& filename) {
         if (line.find("num-cpu") != std::string::npos) {
             iss >> key >> value;
             config.numCpu = value;  
-        }
-        else if (line.find("scheduler") != std::string::npos) {
-            iss >> key >> config.scheduler;  
-        }
-        else if (line.find("quantum-cycles") != std::string::npos) {
+        } else if (line.find("scheduler") != std::string::npos) {
+            iss >> key >> config.scheduler;
+            config.scheduler = config.scheduler.substr(1, config.scheduler.length() - 2);
+        } else if (line.find("quantum-cycles") != std::string::npos) {
             iss >> key >> value;
             config.quantumCycles = value;  
-        }
-        else if (line.find("batch-process-freq") != std::string::npos) {
+        }  else if (line.find("batch-process-freq") != std::string::npos) {
             iss >> key >> value;
             config.batchProcessFreq = value;  
-        }
-        else if (line.find("min-ins") != std::string::npos) {
+        } else if (line.find("min-ins") != std::string::npos) {
             iss >> key >> value;
             config.minIns = value;  
-        }
-        else if (line.find("max-ins") != std::string::npos) {
+        } else if (line.find("max-ins") != std::string::npos) {
             iss >> key >> value;
             config.maxIns = value;  
-        }
-        else if (line.find("delay-per-exec") != std::string::npos) {
+        } else if (line.find("delay-per-exec") != std::string::npos) {
             iss >> key >> value;
             config.delayPerExec = value;  
+        } else if (line.find("max-overall-mem") != std::string::npos) {
+            iss >> key >> value;
+            config.maxOverallMem = value;
+        } else if (line.find("mem-per-frame") != std::string::npos) {
+            iss >> key >> value;
+            config.memPerFrame = value;
+        } else if (line.find("mem-per-proc") != std::string::npos) {  // CHANGE AFTER THE ACTIVITY
+            iss >> key >> value;
+            config.memPerProc = value;
+        } else if (line.find("min-mem-per-proc") != std::string::npos) {
+            iss >> key >> value;
+            config.minMemPerProc = value;
+        } else if (line.find("max-mem-per-proc") != std::string::npos) {
+            iss >> key >> value;
+            config.maxMemPerProc = value;
         }
     }
 
@@ -129,25 +142,31 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
 
         if (scheduler == nullptr) {
             scheduler = new Scheduler(config.numCpu, config.scheduler, config.quantumCycles,
-                config.batchProcessFreq, config.minIns, config.maxIns, config.delayPerExec);
+                config.batchProcessFreq, config.minIns, config.maxIns, config.delayPerExec,
+                config.maxOverallMem, config.memPerFrame, config.memPerProc);
             scheduler->startScheduling();
             ConsoleManager::getInstance()->setScheduler(scheduler);
             ConsoleManager::getInstance()->setConfigInitialize(true);
             isInitialized = true;
             std::string sched;
-            if (config.scheduler == "\"rr\"") {
+            if (config.scheduler == "rr") {
                 sched = "Round Robin";
             }
             else sched = "First Come First Serve";
 
-            std::cout << "CPU configuration initialized!\n";
-            std::cout << "Settings set to: \n";
+            std::cout << "Program configuration initialized!\n";
+            std::cout << "CPU settings set to:" << std::endl;
             std::cout << "   Number of CPUs                - " << config.numCpu << std::endl;
             std::cout << "   Scheduler                     - " << sched << std::endl;
             std::cout << "   Quantum Cycles                - " << config.quantumCycles << std::endl;
             std::cout << "   Frequency of Adding Processes - " << config.batchProcessFreq << std::endl;
             std::cout << "   Range of Instructions         - " << config.minIns << "-" << config.maxIns << std::endl;
             std::cout << "   Delay per Execution           - " << config.delayPerExec << std::endl << std::endl;
+
+            std::cout << "Memory settings set to:" << std::endl;
+            std::cout << "   Maximum Memory Available      - " << config.maxOverallMem << std::endl;
+            std::cout << "   Memory Size per Frame         - " << config.memPerFrame << std::endl;
+            std::cout << "   Memory Size per Process       - " << config.memPerProc << std::endl << std::endl;
 
             x = config.batchProcessFreq;
         }

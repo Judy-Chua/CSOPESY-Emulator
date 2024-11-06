@@ -1,0 +1,3 @@
+update value of availableMemory in allocateMemory and deallocateMemory
+check logic of schedulers and workers
+change memoryManager variable in Scheduler.cpp into global variable

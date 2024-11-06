@@ -1,6 +1,7 @@
 #include "ConsoleManager.h"
 #include "Scheduler.h"
 #include "Process.h"
+#include "MemoryManager.h"
 #include <fstream>
 #include <iostream>
 #include <ctime>
@@ -12,9 +13,10 @@
 
 using namespace std;
 
-Scheduler::Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay) :
+Scheduler::Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay, int memMax, int memFrame, int memProc) :
     numCores(numCores), type(type), coreAvailable(numCores, true), workers(numCores), 
-    timeSlice(timeSlice), batchFreq(freq), minIns(min), maxIns(max), delaysPerExec(delay) {}
+    timeSlice(timeSlice), batchFreq(freq), minIns(min), maxIns(max), delaysPerExec(delay),
+    maxOverallMem(memMax), memPerFrame(memFrame), memPerProc(memProc) {}
 
 void Scheduler::addProcess(std::shared_ptr<Process> process) {
     std::lock_guard<std::mutex> lock(queueMutex);
@@ -24,7 +26,6 @@ void Scheduler::addProcess(std::shared_ptr<Process> process) {
     //std::cout << "Process added: " << process->getName() << " with PID: " << process->getPID() << "\n";
     cv.notify_one();
 }
-
 
 void Scheduler::startScheduling() {
     std::lock_guard<std::mutex> lock(queueMutex);
@@ -87,6 +88,7 @@ void Scheduler::generateProcess() {
 }
 
 void Scheduler::scheduleFCFS() {
+    MemoryManager memoryManager(maxOverallMem, memPerFrame, memPerProc, maxOverallMem); // the last default value is also max
     while (true) {
         std::shared_ptr<Process> process = nullptr;
 
@@ -105,21 +107,25 @@ void Scheduler::scheduleFCFS() {
 
         bool assigned = false;
         for (int coreId = 0; coreId < numCores; ++coreId) {
-            if (coreAvailable[coreId]) { 
-                process->setState(Process::RUNNING);
-                process->setCoreID(coreId); 
-                coreAvailable[coreId] = false; 
+            if (memoryManager.getAvailableMemory() > 0) { // has available memory
+                if (coreAvailable[coreId]) {
+                    process->setState(Process::RUNNING);
+                    process->setCoreID(coreId);
+                    coreAvailable[coreId] = false;
 
-                processQueue.pop(); 
+                    processQueue.pop();
 
-                if (workers[coreId].joinable()) {
-                    workers[coreId].join(); 
+                    if (workers[coreId].joinable()) {
+                        workers[coreId].join();
+                    }
+
+                    workers[coreId] = std::thread(&Scheduler::worker, this, coreId, process);
+                    assigned = true;
+                    break;
                 }
-
-                workers[coreId] = std::thread(&Scheduler::worker, this, coreId, process); 
-                assigned = true;
-                break;
             }
+            else // no more memory
+                processQueue.push(process);
         }
 
         if (!assigned) {
@@ -134,6 +140,7 @@ void Scheduler::scheduleFCFS() {
 }
 
 void Scheduler::scheduleRR() {
+    MemoryManager memoryManager(maxOverallMem, memPerFrame, memPerProc, maxOverallMem); // the last default value is also max
     std::unique_lock<std::mutex> lock(queueMutex);
     while (true) {
         cv.wait(lock, [this] {
@@ -145,21 +152,26 @@ void Scheduler::scheduleRR() {
 
         // Assign process to an available core
         for (int coreId = 0; coreId < numCores; ++coreId) {
-            if (coreAvailable[coreId]) {
-                coreAvailable[coreId] = false;
-                assigned = true;
+            if (memoryManager.getAvailableMemory() > 0) { // has available memory
+                if (coreAvailable[coreId]) {
+                    coreAvailable[coreId] = false;
+                    assigned = true;
 
-                processQueue.pop();
+                    processQueue.pop();
 
-                // Start worker on this core for the process
-                if (workers[coreId].joinable()) {
-                    workers[coreId].join();  // Ensure previous worker is finished
+                    // Start worker on this core for the process
+                    if (workers[coreId].joinable()) {
+                        workers[coreId].join();  // Ensure previous worker is finished
+                    }
+                    workers[coreId] = std::thread(&Scheduler::workerRR, this, coreId, process); // New RR worker
+                    break;
                 }
-                workers[coreId] = std::thread(&Scheduler::workerRR, this, coreId, process); // New RR worker
-                break;
             }
+            else // no more memory
+                processQueue.push(process);
         }
-
+        
+        // TODO: idk where to put this
         if (!assigned) {
             cv.wait(lock, [this] {
                 return std::any_of(coreAvailable.begin(), coreAvailable.end(), [](bool available) { return available; });
@@ -173,6 +185,7 @@ void Scheduler::scheduleRR() {
 
 // Worker function specific to RR scheduling
 void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
+    MemoryManager memoryManager(maxOverallMem, memPerFrame, memPerProc, maxOverallMem); // the last default value is also max
     if (process != nullptr && !process->getName().empty()) {
         auto startCycle = ConsoleManager::getInstance()->getCpuCycle();
         int lastCycle = -1;
@@ -183,6 +196,7 @@ void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
             process->setState(Process::RUNNING);
 
             if (currentCycle - startCycle >= timeSlice) { // Time slice expired, requeue process
+                memoryManager.deallocateMemory(process->getPID());
                 process->setState(Process::WAITING);
                 process->setCoreID(-1);
                 processQueue.push(process);
@@ -194,11 +208,13 @@ void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
             }
 
             if (lastCycle != currentCycle && delaysPerExec == 0) {
+                memoryManager.deallocateMemory(process->getPID());
                 process->executeCommand(coreId);
                 //ConsoleManager::getInstance()->addCpuCycle();
             }
 
             if (delaysPerExec > 0) {
+                memoryManager.allocateMemory(process->getPID());
                 process->executeCommand(coreId);
                 ConsoleManager::getInstance()->addCpuCycle();
                 for (int i = 0; i < delaysPerExec; ++i) {
@@ -220,6 +236,7 @@ void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
 }
 
 void Scheduler::worker(int coreId, std::shared_ptr<Process> process) {
+    MemoryManager memoryManager(maxOverallMem, memPerFrame, memPerProc, maxOverallMem); // the last default value is also max
     if (process != nullptr && !process->getName().empty()) {
         auto currentCycle = ConsoleManager::getInstance()->getCpuCycle();
         auto startCycle = currentCycle;
@@ -227,6 +244,7 @@ void Scheduler::worker(int coreId, std::shared_ptr<Process> process) {
 
         // Process execution
         while (!process->isFinished() && process->getState() != Process::WAITING) {
+            memoryManager.allocateMemory(process->getPID());
             process->executeCommand(coreId);
             //ConsoleManager::getInstance()->addCpuCycle();
 
@@ -245,6 +263,7 @@ void Scheduler::worker(int coreId, std::shared_ptr<Process> process) {
             }
         }
 
+        memoryManager.deallocateMemory(process->getPID());
         coreAvailable[coreId] = true;
 
         cv.notify_one();  // Notify scheduler that a core is now available
