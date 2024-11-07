@@ -32,7 +32,7 @@ void MainConsole::display() {
     std::cout << "   TELOSA, Arwyn Gabrielle\n";
     std::cout << "   UY, Jasmine Louise\n";
     std::cout << "   VALENZUELA, Shanley\n\n";
-    std::cout << "\033[95mLast updated: " << "\033[93m11-03-2024\n";
+    std::cout << "\033[95mLast updated: " << "\033[93m11-08-2024\n";
     std::cout << "\033[97m------------------------------------------------\n\n";
 }
 
@@ -59,7 +59,6 @@ MainConsole::Command MainConsole::getCommand(const std::string& input) const {
     else if (word == "report-util") return isInitialized ? CMD_REPORT_UTIL : CMD_NOT_INITIALIZE;
     else if (word == "clear") return CMD_CLEAR;
     else if (word == "exit") return CMD_EXIT;
-    else if (word == "cpu") return special;
     else return CMD_INVALID;
 }
 
@@ -146,7 +145,6 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
                 config.maxOverallMem, config.memPerFrame, config.memPerProc);
             scheduler->startScheduling();
             ConsoleManager::getInstance()->setScheduler(scheduler);
-            ConsoleManager::getInstance()->setConfigInitialize(true);
             isInitialized = true;
             std::string sched;
             if (config.scheduler == "rr") {
@@ -281,10 +279,6 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
             schedulerThread.join();
         }
         ConsoleManager::getInstance()->exitApplication();
-        break;
-    }
-    case special: {
-        std::cout << ConsoleManager::getInstance()->getCpuCycle() << std::endl << std::endl;
         break;
     }
     case CMD_INVALID:

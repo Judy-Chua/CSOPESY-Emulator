@@ -1,4 +1,5 @@
 #pragma once
+#include "MemoryManager.h"
 #include "Process.h"
 #include <queue>
 #include <thread>
@@ -6,7 +7,7 @@
 #include <vector>
 #include <string>
 #include <condition_variable>
-#include "MemoryManager.h"
+
 
 class Scheduler {
 public:
@@ -31,9 +32,8 @@ private:
     void workerRR(int coreId, std::shared_ptr<Process> process);
     int countAvailCoresRR();
     int countAvailCores();
-    
-    // useless?
-    //void printProcessQueue(const std::queue<std::shared_ptr<Process>>& processQueue);
+
+    MemoryManager memoryManager;
 
     std::thread schedulerThread;
     std::thread generateProcessThread;
@@ -49,7 +49,7 @@ private:
     std::string type;
     std::vector<bool> coreAvailable;
 
-    int numCores;
+    int numCores, cpu;
     int timeSlice = 0;
     int minIns, maxIns, batchFreq, delaysPerExec, maxOverallMem, memPerFrame, memPerProc;
 };

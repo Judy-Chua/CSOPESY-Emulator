@@ -27,8 +27,7 @@ private:
         CMD_REPORT_UTIL,
         CMD_CLEAR,
         CMD_EXIT,
-        CMD_INVALID,
-        special
+        CMD_INVALID
     };
     std::string userInput;
 

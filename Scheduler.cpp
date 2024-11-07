@@ -14,16 +14,16 @@
 using namespace std;
 
 Scheduler::Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay, int memMax, int memFrame, int memProc) :
-    numCores(numCores), type(type), coreAvailable(numCores, true), workers(numCores), 
+    numCores(numCores), type(type), coreAvailable(numCores, true), workers(numCores),
     timeSlice(timeSlice), batchFreq(freq), minIns(min), maxIns(max), delaysPerExec(delay),
-    maxOverallMem(memMax), memPerFrame(memFrame), memPerProc(memProc) {}
+    maxOverallMem(memMax), memPerFrame(memFrame), memPerProc(memProc), cpu(0),
+    memoryManager(memMax, memProc, memFrame, memMax) {}
 
 void Scheduler::addProcess(std::shared_ptr<Process> process) {
     std::lock_guard<std::mutex> lock(queueMutex);
     process->setState(Process::READY); //set to READY first
     processes.push_back(process);
     processQueue.push(process);
-    //std::cout << "Process added: " << process->getName() << " with PID: " << process->getPID() << "\n";
     cv.notify_one();
 }
 
@@ -32,8 +32,10 @@ void Scheduler::startScheduling() {
     stop = false;
     if (!schedulerThread.joinable()) {
         schedulerThread = std::thread(&Scheduler::schedule, this);
-    } 
+    }
 }
+
+//printMemoryLayout
 
 void Scheduler::generateProcesses() {
     if (!generateProcessThread.joinable()) {
@@ -46,14 +48,13 @@ void Scheduler::stopScheduler() {
         std::lock_guard<std::mutex> lock(queueMutex);
         stop = true;
     }
-    cv.notify_all(); 
+    cv.notify_all();
     if (generateProcessThread.joinable()) {
         generateProcessThread.join();
     }
 }
 
 void Scheduler::schedule() {
-    type.erase(remove(type.begin(), type.end(), '\"'), type.end());
     while (true) {
         if (type == "fcfs") {
             scheduleFCFS();
@@ -66,43 +67,39 @@ void Scheduler::schedule() {
 }
 
 void Scheduler::generateProcess() {
-    int lastCycle = -1;
     while (true) {
         {
             std::lock_guard<std::mutex> lock(queueMutex);
-            if (stop) 
+            if (stop)
                 break;  // Exit if stop is true
         }
-        int cpuCycle = ConsoleManager::getInstance()->getCpuCycle();
 
-        if (cpuCycle % batchFreq == 0 && lastCycle != cpuCycle) {
+        if (cpu % batchFreq == 0) {
             int random = generateRandomNumber();
             int lastPID = ConsoleManager::getInstance()->getCurrentPID() + 1;
-            string initialName = "p";
+            string initialName = "P";
             string newName = initialName + to_string(lastPID);
             ConsoleManager::getInstance()->createProcess(newName, random);
-            lastCycle = cpuCycle;
         }
-        this_thread::sleep_for(chrono::milliseconds(10));
+        this_thread::sleep_for(chrono::milliseconds(100));
     }
 }
 
 void Scheduler::scheduleFCFS() {
-    MemoryManager memoryManager(maxOverallMem, memPerFrame, memPerProc, maxOverallMem); // the last default value is also max
     while (true) {
         std::shared_ptr<Process> process = nullptr;
 
         {
             std::unique_lock<std::mutex> lock(queueMutex);
             cv.wait(lock, [this] {
-                return !processQueue.empty(); 
+                return !processQueue.empty();
                 });
 
             if (processQueue.empty()) {
                 break;
             }
 
-            process = processQueue.front(); 
+            process = processQueue.front();
         }
 
         bool assigned = false;
@@ -140,12 +137,11 @@ void Scheduler::scheduleFCFS() {
 }
 
 void Scheduler::scheduleRR() {
-    MemoryManager memoryManager(maxOverallMem, memPerFrame, memPerProc, maxOverallMem); // the last default value is also max
     std::unique_lock<std::mutex> lock(queueMutex);
     while (true) {
         cv.wait(lock, [this] {
             return !processQueue.empty(); // Wait until a process is available in the queue
-        });
+            });
 
         std::shared_ptr<Process> process = processQueue.front();
         bool assigned = false;
@@ -170,12 +166,12 @@ void Scheduler::scheduleRR() {
             else // no more memory
                 processQueue.push(process);
         }
-        
+
         // TODO: idk where to put this
         if (!assigned) {
             cv.wait(lock, [this] {
                 return std::any_of(coreAvailable.begin(), coreAvailable.end(), [](bool available) { return available; });
-            });
+                });
         }
     }
 
@@ -185,82 +181,45 @@ void Scheduler::scheduleRR() {
 
 // Worker function specific to RR scheduling
 void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
-    MemoryManager memoryManager(maxOverallMem, memPerFrame, memPerProc, maxOverallMem); // the last default value is also max
     if (process != nullptr && !process->getName().empty()) {
-        auto startCycle = ConsoleManager::getInstance()->getCpuCycle();
-        int lastCycle = -1;
+        process->setState(Process::RUNNING);
         process->setCoreID(coreId);
+        int ctr = 0;
+
+        memoryManager.allocateMemory(process->getPID());
         // Execute process within the time slice for RR
-        while (!process->isFinished() && process->getCoreID() == coreId)  {
-            auto currentCycle = ConsoleManager::getInstance()->getCpuCycle();
-            process->setState(Process::RUNNING);
-
-            if (currentCycle - startCycle >= timeSlice) { // Time slice expired, requeue process
-                memoryManager.deallocateMemory(process->getPID());
-                process->setState(Process::WAITING);
-                process->setCoreID(-1);
-                processQueue.push(process);
-                coreAvailable[coreId] = true;
-                //ConsoleManager::getInstance()->addCpuCycle();
-
-                cv.notify_one(); // Notify scheduler of available core
-                return; // Exit worker after requeueing
+        while (ctr < timeSlice && !process->isFinished()) {
+            
+            process->executeCommand(coreId);
+            ctr++;
+            cpu++;
+            if (cpu % timeSlice == 0 && cpu != 0) {
+                memoryManager.printMemoryLayout(cpu / timeSlice);
             }
-
-            if (lastCycle != currentCycle && delaysPerExec == 0) {
-                memoryManager.deallocateMemory(process->getPID());
-                process->executeCommand(coreId);
-                //ConsoleManager::getInstance()->addCpuCycle();
-            }
-
-            if (delaysPerExec > 0) {
-                memoryManager.allocateMemory(process->getPID());
-                process->executeCommand(coreId);
-                ConsoleManager::getInstance()->addCpuCycle();
-                for (int i = 0; i < delaysPerExec; ++i) {
-                    std::this_thread::yield();
-
-                    auto currentCycle = ConsoleManager::getInstance()->getCpuCycle();
-                    if (currentCycle - startCycle >= timeSlice) {
-                        break;
-                    }
-                    std::this_thread::sleep_for(std::chrono::microseconds(100));
-                }
-            }
-            lastCycle = currentCycle;
+            std::this_thread::sleep_for(chrono::milliseconds(delaysPerExec));
         }
-        
+
+        memoryManager.deallocateMemory(process->getPID());
         coreAvailable[coreId] = true;
-        cv.notify_one(); // Notify scheduler
+
+        if (!process->isFinished()) {
+            process->setState(Process::WAITING);
+            process->setCoreID(-1);
+            processQueue.push(process);
+        }
+        cv.notify_one(); // Notify scheduler of available core
     }
 }
 
 void Scheduler::worker(int coreId, std::shared_ptr<Process> process) {
-    MemoryManager memoryManager(maxOverallMem, memPerFrame, memPerProc, maxOverallMem); // the last default value is also max
     if (process != nullptr && !process->getName().empty()) {
-        auto currentCycle = ConsoleManager::getInstance()->getCpuCycle();
-        auto startCycle = currentCycle;
         process->setStartTime();
 
+        memoryManager.allocateMemory(process->getPID());
         // Process execution
         while (!process->isFinished() && process->getState() != Process::WAITING) {
-            memoryManager.allocateMemory(process->getPID());
             process->executeCommand(coreId);
-            //ConsoleManager::getInstance()->addCpuCycle();
-
-            if (delaysPerExec > 0) {
-                for (int i = 0; i < delaysPerExec; ++i) {
-                    std::this_thread::yield();
-                    std::this_thread::sleep_for(std::chrono::microseconds(100));
-                }
-            }
-            else {
-                auto targetCycle = currentCycle + 1; // Prepare for the next cycle
-                while (ConsoleManager::getInstance()->getCpuCycle() < targetCycle) {
-                    std::this_thread::yield(); // Yield to allow other threads to execute
-                }
-                currentCycle = ConsoleManager::getInstance()->getCpuCycle(); // Update the current cycle
-            }
+            std::this_thread::sleep_for(std::chrono::duration<int>(delaysPerExec));
         }
 
         memoryManager.deallocateMemory(process->getPID());
@@ -286,12 +245,12 @@ void Scheduler::reportUtil() {
 }
 
 void Scheduler::screenInfo(std::ostream& shortcut) {
-        int runCtr = 0, finCtr = 0, avail = countAvailCores();
-        if (type == "rr") {
-            avail = countAvailCoresRR();
-        }
-        int used = numCores - avail;
-        float percent = float(numCores - avail) / numCores * 100;
+    int runCtr = 0, finCtr = 0, avail = countAvailCores();
+    if (type == "rr") {
+        avail = countAvailCoresRR();
+    }
+    int used = numCores - avail;
+    float percent = float(numCores - avail) / numCores * 100;
 
     shortcut << "CPU Utilization: " << percent << "%" << std::endl;
     shortcut << "Cores used: " << used << std::endl;

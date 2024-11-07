@@ -133,22 +133,6 @@ void ConsoleManager::setScheduler(Scheduler* scheduler) {
     this->scheduler = scheduler;
 }
 
-void ConsoleManager::setConfigInitialize(bool initialize) {
-    configInitialize = initialize;
-}
-
-void ConsoleManager::addCpuCycle() {
-    cpuCycle++;
-}
-
-int ConsoleManager::getCpuCycle() const {
-    return cpuCycle;
-}
-
 int ConsoleManager::getCurrentPID() const {
     return currentPID;
-}
-
-bool ConsoleManager::isConfigInitialized() const {
-    return configInitialize;
 }

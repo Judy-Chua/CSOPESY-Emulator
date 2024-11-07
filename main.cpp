@@ -11,10 +11,6 @@ int main() {
 
     while (consoleManager->isRunning()) {
         consoleManager->process();
-
-        if (consoleManager->isConfigInitialized()) {
-            consoleManager->addCpuCycle();
-        }
     }
 
     ConsoleManager::destroy();

@@ -1,3 +1,13 @@
-update value of availableMemory in allocateMemory and deallocateMemory
-check logic of schedulers and workers
-change memoryManager variable in Scheduler.cpp into global variable
+working code
+>did not use BackingStore and FlatMemoryAllocator codes kasi time consuming
+ pero inupload ko na rin tho need pa yun ng editing
+
+remember to create "memory" folder sa build kasi dito masostore yung logs
+
+will record this later after class or maybe before
+
+try to debug na rin siguro because i did not debug much
+
+i did not try yung delay = 0 (may error ata logically)
+higher delay is goods para makita talaga changes
+lower delay is very fast sooooo idk

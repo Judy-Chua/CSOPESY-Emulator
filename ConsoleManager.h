@@ -30,12 +30,8 @@ public:
 
 	void createProcess(const std::string& processName, int lines);
 	void setScheduler(Scheduler* scheduler);
-	void setConfigInitialize(bool initialize);
-	void addCpuCycle();
 
-	int getCpuCycle() const;
 	int getCurrentPID() const;
-	bool isConfigInitialized() const;
 
 	Processes processes;
 	ConsoleTable consoleTable;
@@ -53,8 +49,6 @@ private:
 
 	HANDLE consoleHandle;
 	bool running = true;
-	bool configInitialize = false;
-	int cpuCycle = 0;
 	int currentPID = 1000;
 };
 
