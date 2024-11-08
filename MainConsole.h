@@ -19,12 +19,14 @@ private:
     std::mutex screenMutex;
     enum Command {
         CMD_INITIALIZE,
-        CMD_NOT_INITIALIZE,
+        CMD_NOT_INITIALIZED,
         CMD_SCREEN,
         CMD_SCREEN_ACTIVE,
         CMD_SCHEDULER_TEST,
         CMD_SCHEDULER_STOP,
         CMD_REPORT_UTIL,
+        CMD_PROCESS_SMI,
+        CMD_VMSTAT,
         CMD_CLEAR,
         CMD_EXIT,
         CMD_INVALID

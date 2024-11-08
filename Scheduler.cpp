@@ -245,16 +245,11 @@ void Scheduler::reportUtil() {
 }
 
 void Scheduler::screenInfo(std::ostream& shortcut) {
-    int runCtr = 0, finCtr = 0, avail = countAvailCores();
-    if (type == "rr") {
-        avail = countAvailCoresRR();
-    }
-    int used = numCores - avail;
-    float percent = float(numCores - avail) / numCores * 100;
+    int runCtr = 0, finCtr = 0;
 
-    shortcut << "CPU Utilization: " << percent << "%" << std::endl;
-    shortcut << "Cores used: " << used << std::endl;
-    shortcut << "Cores available: " << avail << std::endl << std::endl;
+    shortcut << "CPU Utilization: " << getCpuUtilization() << "%" << std::endl;
+    shortcut << "Cores used: " << getUsedCores() << std::endl;
+    shortcut << "Cores available: " << countAvailCores() << std::endl << std::endl;
     shortcut << "--------------------------------------------------\n";
     shortcut << "Running processes:\n";
 
@@ -262,8 +257,10 @@ void Scheduler::screenInfo(std::ostream& shortcut) {
         std::lock_guard<std::mutex> lock(queueMutex);
         for (const auto& process : processes) {
             string coreID;
-            if (process->getCoreID() != -1) { coreID = to_string(process->getCoreID()); }
-            else { coreID = "N/A"; }
+            if (process->getCoreID() != -1)
+                coreID = to_string(process->getCoreID());
+            else
+                coreID = "N/A";
 
             if (process->getState() != Process::FINISHED && process->getCoreID() != -1) {
                 shortcut << process->getName() << "\tStarted: " << process->getStartTime()
@@ -300,35 +297,74 @@ void Scheduler::screenInfo(std::ostream& shortcut) {
     shortcut << "--------------------------------------------------\n\n";
 }
 
-int Scheduler::countAvailCores() {
-    int count = numCores;
-    {
-        std::lock_guard<std::mutex> lock(queueMutex);
-        for (const auto& process : processes) { //more updated version instead of checking coresAvailable
-            if (process->getState() == Process::RUNNING && process->getCoreID() != -1) {
-                count--;
-            }
-        }
-    }
-    return count;
-}
-
-int Scheduler::countAvailCoresRR() {
-    int count = 0;
-    {
-        std::lock_guard<std::mutex> lock(queueMutex);
-        for (int coreId = 0; coreId < numCores; ++coreId) {
-            if (coreAvailable[coreId]) { // Check if core is marked as available
-                count++;
-            }
-        }
-    }
-    return count;
-}
-
 int Scheduler::generateRandomNumber() {
     random_device random;
     mt19937 generate(random());
     uniform_int_distribution<> distr(minIns, maxIns);
     return distr(generate);
+}
+
+void Scheduler::printProcessSMI() {
+    std::cout << "----------------------------------------------" << std::endl;
+    std::cout << "| PROCESS-SMI vxx.xx Driver Version: xx.xx |" << std::endl;
+    std::cout << "----------------------------------------------" << std::endl;
+    std::cout << "CPU-Util: " <<  getCpuUtilization() << "%" << std::endl;
+    std::cout << "Memory Usage: " << memoryManager.getUsedMemory() << "MiB / " << memoryManager.getMaxMemory() << "MiB" << std::endl;
+    std::cout << "Memory Util: " << memoryManager.getMemoryUtil() << "%" << std::endl << std::endl;
+    std::cout << "==============================================" << std::endl;
+    std::cout << "Running processes and memory usage:" << std::endl;
+    std::cout << "----------------------------------------------" << std::endl;
+    std::cout << "pXXXX" <<  "\t" << "xxx" << "MiB" << std::endl;
+    std::cout << "----------------------------------------------" << std::endl << std::endl;
+}
+
+void Scheduler::printVmstat() {
+    std::cout << memoryManager.getMaxMemory() << "\t K total memory" << std::endl;
+    std::cout << memoryManager.getUsedMemory() << "\t K used memory" << std::endl;
+    std::cout << memoryManager.getAvailableMemory() << "\t K free memory" << std::endl;
+    std::cout << "xxxxxxxx\t K idle cpu ticks" << std::endl;
+    std::cout << "xxxxxxxx\t K active cpu ticks" << std::endl;
+    std::cout << "xxxxxxxx\t K total cpu ticks" << std::endl;
+    std::cout << "xxxxxxxx\t K num paged in" << std::endl;
+    std::cout << "xxxxxxxx\t K num paged out" << std::endl << std::endl;
+}
+
+int Scheduler::countAvailCores() {
+    int count = 0;
+    if (type == "rr") {
+        // count = 0;
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            for (int coreId = 0; coreId < numCores; ++coreId) {
+                if (coreAvailable[coreId]) { // Check if core is marked as available
+                    count++;
+                }
+            }
+        }
+    }
+    else { // fcfs
+        count = numCores;
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            for (const auto& process : processes) { //more updated version instead of checking coresAvailable
+                if (process->getState() == Process::RUNNING && process->getCoreID() != -1) {
+                    count--;
+                }
+            }
+        }
+    }
+    return count;
+}
+
+int Scheduler::getUsedCores() {
+    int avail = countAvailCores();
+    int used =  numCores - avail;
+    return used;
+}
+
+float Scheduler::getCpuUtilization() {
+    int used = getUsedCores();
+    float percent = float(used) / numCores * 100;
+
+    return percent;
 }

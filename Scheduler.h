@@ -25,12 +25,17 @@ public:
 
     int generateRandomNumber();
 
+    void printProcessSMI();
+    void printVmstat();
+
+    int getUsedCores();
+    float getCpuUtilization();
+
 private:
     void schedule();
     void generateProcess();
     void worker(int coreId, std::shared_ptr<Process> process);
     void workerRR(int coreId, std::shared_ptr<Process> process);
-    int countAvailCoresRR();
     int countAvailCores();
 
     MemoryManager memoryManager;

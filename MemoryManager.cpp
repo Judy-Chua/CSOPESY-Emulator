@@ -105,3 +105,18 @@ int MemoryManager::getAvailableMemory() const {
 void MemoryManager::setAvailableMemory(int available) {
     availableMemory = available;
 }
+
+int MemoryManager::getMaxMemory() const {
+    return maxMemory;
+}
+
+int MemoryManager::getUsedMemory() const {
+    return getMaxMemory() - getAvailableMemory();
+}
+
+float MemoryManager::getMemoryUtil() const {
+    int used = getUsedMemory();
+    float util = float(used) / getMaxMemory() * 100;
+
+    return util;
+}

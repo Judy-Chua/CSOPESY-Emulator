@@ -32,4 +32,7 @@ public:
     std::string getCurrentTime() const;
     int getAvailableMemory() const;
     void setAvailableMemory(int free);
+    int getMaxMemory() const;
+    int getUsedMemory() const;
+    float getMemoryUtil() const;
 };
