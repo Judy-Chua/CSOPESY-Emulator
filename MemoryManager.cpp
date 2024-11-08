@@ -7,9 +7,9 @@
 #include <iostream>
 
 // Constructor: Initialize memory with -1 (indicating free space)
-MemoryManager::MemoryManager(int maxMemory, int memPerPoc, int frameSize, int availableMemory) : memory(maxMemory / memPerPoc, -1) {
+MemoryManager::MemoryManager(int maxMemory, int memPerProc, int frameSize, int availableMemory) : memory(maxMemory / memPerProc, -1) {
     this->maxMemory = maxMemory;
-    this->memPerProc = memPerPoc;
+    this->memPerProc = memPerProc;
     this->frameSize = frameSize;
     this->availableMemory = availableMemory;
 }
