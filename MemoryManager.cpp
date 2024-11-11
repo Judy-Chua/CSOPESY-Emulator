@@ -4,59 +4,65 @@
 #include <chrono>
 #include <fstream>
 #include <ctime>
-#include <iostream>
-
 // Constructor: Initialize memory with -1 (indicating free space)
-MemoryManager::MemoryManager(int maxMemory, int memPerProc, int frameSize, int availableMemory) : memory(maxMemory / memPerProc, -1) {
-    this->maxMemory = maxMemory;
-    this->memPerProc = memPerProc;
-    this->frameSize = frameSize;
-    this->availableMemory = availableMemory;
-}
+MemoryManager::MemoryManager(int maxMemory, int memPerProc, int frameSize, int availableMemory)
+    : memory(maxMemory / memPerProc, -1), maxMemory(maxMemory), memPerProc(memPerProc),
+    frameSize(frameSize), availableMemory(availableMemory) {}
 
 // First-fit memory allocation
 bool MemoryManager::allocateMemory(int pid) {
     int block = memPerProc;
     int maxBlocks = maxMemory / block;
- 
-    // First-fit algorithm to find the first block of free memory
+
     for (int i = 0; i < maxBlocks; ++i) {
         if (memory[i] == -1) {
             memory[i] = pid;
-            
-            processes.push_back({ pid, i * block, (i + 1) * block - 1, true });
+            processes.push_back({ pid, i * block, (i + 1) * block - 1, true, false });
             availableMemory -= block;
             return true;
         }
     }
 
-    // If allocation fails, calculate external fragmentation
-    totalFragmentation = maxMemory - block;
-    return false;
-}
-
-// Deallocate memory when the process finishes
-void MemoryManager::deallocateMemory(int pid) {
-    int freedMemory = 0;
-    for (int i = 0; i < memory.size(); ++i) {
-        if (memory[i] == pid) {
-            memory[i] = -1;
-            freedMemory += memPerProc;
-        }
-    }
-
-    availableMemory += freedMemory;
-
-    // Remove the process from the active list
+    // If memory is full, move the oldest process to the ready queue
     for (auto& p : processes) {
-        if (p.pid == pid) {
-            p.active = false;
-            break;
+        if (!p.isRunning && p.active) { // Check for idle processes
+            deallocateMemory(p.pid);
+            return allocateMemory(pid);
+        }
+    }
+
+    return false; // Memory allocation failed
+}
+
+// Deallocate memory only if the process is finished
+void MemoryManager::deallocateMemory(int pid) {
+    for (auto& p : processes) {
+        if (p.pid == pid && !p.isRunning) {
+            int block = memPerProc;
+            int maxBlocks = maxMemory / block;
+
+            for (int i = 0; i < maxBlocks; ++i) {
+                if (memory[i] == pid) {
+                    memory[i] = -1;
+                    availableMemory += block;
+                }
+            }
+            p.active = false; // Mark process as deallocated
+            return;
         }
     }
 }
 
-// Print memory layout, timestamp, process details, and fragmentation status
+// Mark a process as idle when not running
+void MemoryManager::markIdle(int pid) {
+    for (auto& p : processes) {
+        if (p.pid == pid && p.active) {
+            p.isRunning = false;
+        }
+    }
+}
+
+// Print memory layout every quantum cycle
 void MemoryManager::printMemoryLayout(int cycle) const {
     std::ofstream file("memory\\memory_stamp_" + std::to_string(cycle) + ".txt");
     file << "Timestamp: " << getCurrentTime() << "\n";
@@ -70,22 +76,12 @@ void MemoryManager::printMemoryLayout(int cycle) const {
             file << "P" << p.pid << "\n";
             file << p.memoryStart << "\n\n";
         }
-        
     }
     file << "\n----start---- = 0\n";
     file.close();
 }
 
-// Get the number of active processes
-int MemoryManager::getActiveProcessesCount() const {
-    int count = 0;
-    for (const auto& p : processes) {
-        if (p.active) ++count;
-    }
-    return count;
-}
-
-// Get the current timestamp in a human-readable format
+// Get the current timestamp
 std::string MemoryManager::getCurrentTime() const {
     auto now = std::chrono::system_clock::now();
     time_t currentTime = std::chrono::system_clock::to_time_t(now);
@@ -94,29 +90,22 @@ std::string MemoryManager::getCurrentTime() const {
 
     char timeStr[100];
     strftime(timeStr, sizeof(timeStr), "%m/%d/%Y %I:%M:%S %p", &buf);
-
     return timeStr;
 }
 
-int MemoryManager::getAvailableMemory() const {
+int MemoryManager::getActiveProcessesCount() const {
+    int count = 0;
+    for (const auto& p : processes) {
+        if (p.active) ++count;
+    }
+    return count;
+}
+
+int MemoryManager::getAvailableMemory() const { 
     return availableMemory;
 }
 
-void MemoryManager::setAvailableMemory(int available) {
-    availableMemory = available;
+void MemoryManager::setAvailableMemory(int free) { 
+    this->availableMemory = free;
 }
 
-int MemoryManager::getMaxMemory() const {
-    return maxMemory;
-}
-
-int MemoryManager::getUsedMemory() const {
-    return getMaxMemory() - getAvailableMemory();
-}
-
-float MemoryManager::getMemoryUtil() const {
-    int used = getUsedMemory();
-    float util = float(used) / getMaxMemory() * 100;
-
-    return util;
-}
