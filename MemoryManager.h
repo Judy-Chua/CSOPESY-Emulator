@@ -6,10 +6,12 @@
 #include <fstream>
 
 struct Proc {
-    int pid;
-    int memoryStart;
-    int memoryEnd;
-    bool active;
+    int pid;               // Process ID
+    int memoryStart;       // Start address in memory
+    int memoryEnd;         // End address in memory
+    bool active;           // Indicates if the process is in memory
+    bool isRunning;        // Indicates if the process is running on the CPU
+
 };
 
 class MemoryManager {
@@ -27,6 +29,7 @@ public:
     MemoryManager(int maxMemory, int memPerProc, int frameSize, int availableMemory);
     bool allocateMemory(int pid);
     void deallocateMemory(int pid);
+    void markIdle(int pid)
     void printMemoryLayout(int cycle) const;
     int getActiveProcessesCount() const;
     std::string getCurrentTime() const;
