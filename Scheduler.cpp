@@ -35,8 +35,6 @@ void Scheduler::startScheduling() {
     }
 }
 
-//printMemoryLayout
-
 void Scheduler::generateProcesses() {
     if (!generateProcessThread.joinable()) {
         generateProcessThread = std::thread(&Scheduler::generateProcess, this);
@@ -71,7 +69,6 @@ void Scheduler::generateProcess() {
         {
             std::lock_guard<std::mutex> lock(queueMutex);
             if (stop) {
-                std::cout << "Stopping process generation thread.\n";
                 break;  // Exit if stop is true
             }
         }
@@ -83,7 +80,7 @@ void Scheduler::generateProcess() {
             string newName = initialName + to_string(lastPID);
             ConsoleManager::getInstance()->createProcess(newName, random);
         }
-        this_thread::sleep_for(chrono::milliseconds(delaysPerExec));
+        this_thread::sleep_for(chrono::milliseconds(10));
     }
 }
 
@@ -146,7 +143,6 @@ void Scheduler::scheduleRR() {
             });
 
         std::shared_ptr<Process> process = processQueue.front();
-        processQueue.pop();
         bool assigned = false;
 
         // Assign process to an available core
@@ -155,7 +151,7 @@ void Scheduler::scheduleRR() {
                 if (coreAvailable[coreId]) {
                     coreAvailable[coreId] = false;
                     assigned = true;
-
+                    processQueue.pop();
                     // Start worker on this core for the process
                     if (workers[coreId].joinable()) {
                         workers[coreId].join();  // Ensure previous worker is finished
@@ -167,20 +163,12 @@ void Scheduler::scheduleRR() {
         }
 
         if (!assigned) { //no memory or core so go back
+            processQueue.pop();
             processQueue.push(process);
             cv.wait(lock, [this] {
                 return std::any_of(coreAvailable.begin(), coreAvailable.end(), [](bool available) { return available; });
                 });
         }
-
-        /*
-        // TODO: idk where to put this
-        if (!assigned) {
-            cv.wait(lock, [this] {
-                return std::any_of(coreAvailable.begin(), coreAvailable.end(), [](bool available) { return available; });
-                });
-        }
-        */
     }
 
     lock.unlock();
@@ -245,13 +233,13 @@ void Scheduler::worker(int coreId, std::shared_ptr<Process> process) {
 }
 
 void Scheduler::printActiveScreen() {
-    screenInfo(std::cout , false);
+    screenInfo(std::cout);
 }
 
 void Scheduler::reportUtil() {
     std::ofstream outFile("csopesy-log.txt");
     if (outFile.is_open()) {
-        screenInfo(outFile, true);
+        screenInfo(outFile);
         outFile.close();
     }
     else {
@@ -259,35 +247,18 @@ void Scheduler::reportUtil() {
     }
 }
 
-<<<<<<< Updated upstream
 void Scheduler::screenInfo(std::ostream& shortcut) {
-    int runCtr = 0, finCtr = 0, avail = countAvailCores();
-    if (type == "rr") {
-        avail = countAvailCoresRR();
-    }
-    int used = numCores - avail;
-    float percent = float(numCores - avail) / numCores * 100;
-=======
-void Scheduler::screenInfo(std::ostream& shortcut, bool erm) {
     int runCtr = 0, finCtr = 0;
->>>>>>> Stashed changes
 
-    shortcut << "CPU Utilization: " << percent << "%" << std::endl;
-    shortcut << "Cores used: " << used << std::endl;
-    shortcut << "Cores available: " << avail << std::endl << std::endl;
+    shortcut << "CPU Utilization: " << getCpuUtilization() << "%" << std::endl;
+    shortcut << "Cores used: " << getUsedCores() << std::endl;
+    shortcut << "Cores available: " << countAvailCores() << std::endl << std::endl;
     shortcut << "--------------------------------------------------\n";
     shortcut << "Running processes:\n";
 
     {
         std::lock_guard<std::mutex> lock(queueMutex);
         for (const auto& process : processes) {
-<<<<<<< Updated upstream
-            string coreID;
-            if (process->getCoreID() != -1) { coreID = to_string(process->getCoreID()); }
-            else { coreID = "N/A"; }
-
-=======
->>>>>>> Stashed changes
             if (process->getState() != Process::FINISHED && process->getCoreID() != -1) {
                 shortcut << process->getName() << "\tStarted: " << process->getStartTime()
                     << "   Core: " << process->getCoreID() << "   " << process->getCommandCounter() << " / "
@@ -320,26 +291,9 @@ void Scheduler::screenInfo(std::ostream& shortcut, bool erm) {
     if (finCtr == 0) {
         shortcut << "    No finished processes.\n";
     }
-
-    if (erm) {
-        shortcut << "Processes in Queue:\n";
-
-        {
-            std::lock_guard<std::mutex> lock(queueMutex);
-            for (const auto& process : processes) {
-                if (process->getCoreID() == -1) {
-                    shortcut << process->getName() << std::endl;
-                }
-            }
-        }
-    }
-    
-
     shortcut << "--------------------------------------------------\n\n";
 }
 
-<<<<<<< Updated upstream
-=======
 int Scheduler::generateRandomNumber() {
     random_device random;
     mt19937 generate(random());
@@ -374,36 +328,42 @@ void Scheduler::printVmstat() {
 }
 */
 
->>>>>>> Stashed changes
 int Scheduler::countAvailCores() {
-    int count = numCores;
-    {
-        std::lock_guard<std::mutex> lock(queueMutex);
-        for (const auto& process : processes) { //more updated version instead of checking coresAvailable
-            if (process->getState() == Process::RUNNING && process->getCoreID() != -1) {
-                count--;
-            }
-        }
-    }
-    return count;
-}
-
-int Scheduler::countAvailCoresRR() {
     int count = 0;
-    {
-        std::lock_guard<std::mutex> lock(queueMutex);
-        for (int coreId = 0; coreId < numCores; ++coreId) {
-            if (coreAvailable[coreId]) { // Check if core is marked as available
-                count++;
+    if (type == "rr") {
+        // count = 0;
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            for (int coreId = 0; coreId < numCores; ++coreId) {
+                if (coreAvailable[coreId]) { // Check if core is marked as available
+                    count++;
+                }
+            }
+        }
+    }
+    else { // fcfs
+        count = numCores;
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            for (const auto& process : processes) { //more updated version instead of checking coresAvailable
+                if (process->getState() == Process::RUNNING && process->getCoreID() != -1) {
+                    count--;
+                }
             }
         }
     }
     return count;
 }
 
-int Scheduler::generateRandomNumber() {
-    random_device random;
-    mt19937 generate(random());
-    uniform_int_distribution<> distr(minIns, maxIns);
-    return distr(generate);
+int Scheduler::getUsedCores() {
+    int avail = countAvailCores();
+    int used = numCores - avail;
+    return used;
+}
+
+float Scheduler::getCpuUtilization() {
+    int used = getUsedCores();
+    float percent = float(used) / numCores * 100;
+
+    return percent;
 }

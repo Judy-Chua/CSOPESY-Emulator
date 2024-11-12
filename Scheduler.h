@@ -18,28 +18,24 @@ public:
     void stopScheduler();
     void printActiveScreen();
     void reportUtil();
-    void screenInfo(std::ostream& shortcut, bool erm);
+    void screenInfo(std::ostream& shortcut);
 
     void scheduleFCFS();
     void scheduleRR();
 
     int generateRandomNumber();
-<<<<<<< Updated upstream
-=======
     /*
     void printProcessSMI();
     void printVmstat();*/
 
     int getUsedCores();
     float getCpuUtilization();
->>>>>>> Stashed changes
 
 private:
     void schedule();
     void generateProcess();
     void worker(int coreId, std::shared_ptr<Process> process);
     void workerRR(int coreId, std::shared_ptr<Process> process);
-    int countAvailCoresRR();
     int countAvailCores();
 
     MemoryManager memoryManager;

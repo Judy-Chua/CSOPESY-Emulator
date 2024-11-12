@@ -6,19 +6,11 @@
 #include <fstream>
 
 struct Proc {
-<<<<<<< Updated upstream
-    int pid;
-    int memoryStart;
-    int memoryEnd;
-    bool active;
-=======
     int pid;               // Process ID
     int memoryStart;       // Start address in memory
     int memoryEnd;         // End address in memory
     bool active;           // Indicates if the process is in memory
     bool isIdle;        // Indicates if the process is running on the CPU
-
->>>>>>> Stashed changes
 };
 
 class MemoryManager {
@@ -37,20 +29,14 @@ public:
     bool allocateMemory(int pid);
     bool isAllocated(int pid);
     void deallocateMemory(int pid);
-<<<<<<< Updated upstream
-=======
     void setIdle(int pid, bool set);
->>>>>>> Stashed changes
     void printMemoryLayout(int cycle) const;
     int getActiveProcessesCount() const;
     std::string getCurrentTime() const;
     int getAvailableMemory() const;
     void setAvailableMemory(int free);
-<<<<<<< Updated upstream
-=======
     /*
     int getMaxMemory() const;
     int getUsedMemory() const;
     float getMemoryUtil() const; */
->>>>>>> Stashed changes
 };
