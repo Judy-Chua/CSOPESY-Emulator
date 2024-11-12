@@ -24,6 +24,12 @@ public:
     void scheduleRR();
 
     int generateRandomNumber();
+    /*
+    void printProcessSMI();
+    void printVmstat();*/
+
+    int getUsedCores();
+    float getCpuUtilization();
 
     void printProcessSMI();
     void printVmstat();

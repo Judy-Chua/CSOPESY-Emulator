@@ -268,6 +268,7 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
         scheduler->reportUtil();
         break;
     }
+    /*
     case CMD_PROCESS_SMI: {
         if (scheduler != nullptr)
             scheduler->printProcessSMI();
@@ -277,7 +278,7 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
         if (scheduler != nullptr)
             scheduler->printVmstat();
         break;
-    }
+    }*/
     case CMD_CLEAR: {
         system("cls");  // Clear the screen
         display();

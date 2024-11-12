@@ -35,8 +35,6 @@ void Scheduler::startScheduling() {
     }
 }
 
-//printMemoryLayout
-
 void Scheduler::generateProcesses() {
     if (!generateProcessThread.joinable()) {
         generateProcessThread = std::thread(&Scheduler::generateProcess, this);
@@ -48,10 +46,10 @@ void Scheduler::stopScheduler() {
         std::lock_guard<std::mutex> lock(queueMutex);
         stop = true;
     }
-    cv.notify_all();
     if (generateProcessThread.joinable()) {
         generateProcessThread.join();
     }
+    cv.notify_all();
 }
 
 void Scheduler::schedule() {
@@ -70,8 +68,9 @@ void Scheduler::generateProcess() {
     while (true) {
         {
             std::lock_guard<std::mutex> lock(queueMutex);
-            if (stop)
+            if (stop) {
                 break;  // Exit if stop is true
+            }
         }
 
         if (cpu % batchFreq == 0) {
@@ -81,7 +80,7 @@ void Scheduler::generateProcess() {
             string newName = initialName + to_string(lastPID);
             ConsoleManager::getInstance()->createProcess(newName, random);
         }
-        this_thread::sleep_for(chrono::milliseconds(100));
+        this_thread::sleep_for(chrono::milliseconds(10));
     }
 }
 
@@ -147,14 +146,12 @@ void Scheduler::scheduleRR() {
         bool assigned = false;
 
         // Assign process to an available core
-        for (int coreId = 0; coreId < numCores; ++coreId) {
-            if (memoryManager.getAvailableMemory() > 0) { // has available memory
+        for (int coreId = 0; coreId < numCores; ++coreId) {  // has available memory or already in memory
+            if (memoryManager.getAvailableMemory() > 0 || memoryManager.isAllocated(process->getPID())) { 
                 if (coreAvailable[coreId]) {
                     coreAvailable[coreId] = false;
                     assigned = true;
-
                     processQueue.pop();
-
                     // Start worker on this core for the process
                     if (workers[coreId].joinable()) {
                         workers[coreId].join();  // Ensure previous worker is finished
@@ -163,12 +160,11 @@ void Scheduler::scheduleRR() {
                     break;
                 }
             }
-            else // no more memory
-                processQueue.push(process);
         }
 
-        // TODO: idk where to put this
-        if (!assigned) {
+        if (!assigned) { //no memory or core so go back
+            processQueue.pop();
+            processQueue.push(process);
             cv.wait(lock, [this] {
                 return std::any_of(coreAvailable.begin(), coreAvailable.end(), [](bool available) { return available; });
                 });
@@ -181,15 +177,20 @@ void Scheduler::scheduleRR() {
 
 // Worker function specific to RR scheduling
 void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
+    if (process == nullptr) {
+        return;
+    }
     if (process != nullptr && !process->getName().empty()) {
         process->setState(Process::RUNNING);
         process->setCoreID(coreId);
         int ctr = 0;
-
-        memoryManager.allocateMemory(process->getPID());
+        
+        if (!memoryManager.isAllocated(process->getPID())) {
+            memoryManager.allocateMemory(process->getPID());
+        }
+        
         // Execute process within the time slice for RR
         while (ctr < timeSlice && !process->isFinished()) {
-            
             process->executeCommand(coreId);
             ctr++;
             cpu++;
@@ -198,14 +199,15 @@ void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
             }
             std::this_thread::sleep_for(chrono::milliseconds(delaysPerExec));
         }
+        coreAvailable[coreId] = true;   //set to true now since done
 
-        memoryManager.deallocateMemory(process->getPID());
-        coreAvailable[coreId] = true;
-
-        if (!process->isFinished()) {
+        if (!process->isFinished()) {   //process not yet done
             process->setState(Process::WAITING);
             process->setCoreID(-1);
             processQueue.push(process);
+        }
+        else {  //already finished so deallocate
+            memoryManager.deallocateMemory(process->getPID());
         }
         cv.notify_one(); // Notify scheduler of available core
     }
@@ -256,15 +258,9 @@ void Scheduler::screenInfo(std::ostream& shortcut) {
     {
         std::lock_guard<std::mutex> lock(queueMutex);
         for (const auto& process : processes) {
-            string coreID;
-            if (process->getCoreID() != -1)
-                coreID = to_string(process->getCoreID());
-            else
-                coreID = "N/A";
-
             if (process->getState() != Process::FINISHED && process->getCoreID() != -1) {
                 shortcut << process->getName() << "\tStarted: " << process->getStartTime()
-                    << "   Core: " << coreID << "   " << process->getCommandCounter() << " / "
+                    << "   Core: " << process->getCoreID() << "   " << process->getCommandCounter() << " / "
                     << process->getLinesOfCode() << std::endl;
                 runCtr++;
             }
@@ -304,6 +300,7 @@ int Scheduler::generateRandomNumber() {
     return distr(generate);
 }
 
+/*
 void Scheduler::printProcessSMI() {
     std::cout << "----------------------------------------------" << std::endl;
     std::cout << "| PROCESS-SMI vxx.xx Driver Version: xx.xx |" << std::endl;
@@ -328,6 +325,8 @@ void Scheduler::printVmstat() {
     std::cout << "xxxxxxxx\t K num paged in" << std::endl;
     std::cout << "xxxxxxxx\t K num paged out" << std::endl << std::endl;
 }
+*/
+
 
 int Scheduler::countAvailCores() {
     int count = 0;
@@ -358,7 +357,7 @@ int Scheduler::countAvailCores() {
 
 int Scheduler::getUsedCores() {
     int avail = countAvailCores();
-    int used =  numCores - avail;
+    int used = numCores - avail;
     return used;
 }
 

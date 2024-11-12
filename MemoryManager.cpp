@@ -14,27 +14,34 @@ bool MemoryManager::allocateMemory(int pid) {
     int block = memPerProc;
     int maxBlocks = maxMemory / block;
 
+    // First-fit algorithm to find the first block of free memory
     for (int i = 0; i < maxBlocks; ++i) {
         if (memory[i] == -1) {
             memory[i] = pid;
-            processes.push_back({ pid, i * block, (i + 1) * block - 1, true, false });
+            processes.push_back({ pid, i * block, (i + 1) * block - 1, true });
             availableMemory -= block;
             return true;
         }
     }
 
-    // If memory is full, move the oldest process to the ready queue
-    for (auto& p : processes) {
-        if (!p.isRunning && p.active) { // Check for idle processes
-            deallocateMemory(p.pid);
-            return allocateMemory(pid);
-        }
-    }
-
-    return false; // Memory allocation failed
+    // If allocation fails, calculate external fragmentation
+    totalFragmentation += block;
+    return false;
 }
 
-// Deallocate memory only if the process is finished
+// Returns if process is already in the memory or not
+bool MemoryManager::isAllocated(int pid) {
+    bool allocated = false;
+    for (int i = 0; i < memory.size(); ++i) {
+        if (memory[i] == pid) {
+            allocated = true;
+            break;
+        }
+    }
+    return allocated;
+}
+
+// Deallocate memory when the process finishes
 void MemoryManager::deallocateMemory(int pid) {
     for (auto& p : processes) {
         if (p.pid == pid && !p.isRunning) {
@@ -77,7 +84,7 @@ void MemoryManager::printMemoryLayout(int cycle) const {
             file << p.memoryStart << "\n\n";
         }
     }
-    file << "\n----start---- = 0\n";
+    file << "----start---- = 0\n";
     file.close();
 }
 
