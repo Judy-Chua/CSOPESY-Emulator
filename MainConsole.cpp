@@ -53,10 +53,12 @@ MainConsole::Command MainConsole::getCommand(const std::string& input) const {
     word = toLowerCase(word);
 
     if (word == "initialize") return CMD_INITIALIZE;
-    else if (word == "screen") return CMD_SCREEN; 
-    else if (word == "scheduler-test") return isInitialized ? CMD_SCHEDULER_TEST : CMD_NOT_INITIALIZE;
-    else if (word == "scheduler-stop") return isInitialized ? CMD_SCHEDULER_STOP : CMD_NOT_INITIALIZE;
-    else if (word == "report-util") return isInitialized ? CMD_REPORT_UTIL : CMD_NOT_INITIALIZE;
+    else if (word == "screen") return isInitialized ? CMD_SCREEN : CMD_NOT_INITIALIZED;
+    else if (word == "scheduler-test") return isInitialized ? CMD_SCHEDULER_TEST : CMD_NOT_INITIALIZED;
+    else if (word == "scheduler-stop") return isInitialized ? CMD_SCHEDULER_STOP : CMD_NOT_INITIALIZED;
+    else if (word == "report-util") return isInitialized ? CMD_REPORT_UTIL : CMD_NOT_INITIALIZED;
+    else if (word == "process-smi") return isInitialized ? CMD_PROCESS_SMI : CMD_NOT_INITIALIZED;
+    else if (word == "vmstat") return isInitialized ? CMD_VMSTAT : CMD_NOT_INITIALIZED;
     else if (word == "clear") return CMD_CLEAR;
     else if (word == "exit") return CMD_EXIT;
     else return CMD_INVALID;
@@ -173,13 +175,13 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
         }
         break;
     }
-    case CMD_NOT_INITIALIZE: {
-        std::cout << "ERROR: Initialize the CPU configuration before using other commands.\n" << std::endl;
+    case CMD_NOT_INITIALIZED: {
+        std::cout << "ERROR: Initialize the configuration before using other commands.\n" << std::endl;
         break;
     }
     case CMD_SCREEN: {
         if (!isInitialized) {
-            std::cout << "ERROR: Initialize the CPU configuration first.\n";
+            std::cout << "ERROR: Initialize the configuration first.\n";
             break;
         }
         std::istringstream iss(userInput);
@@ -219,9 +221,8 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
             ConsoleManager::getInstance()->switchConsole(parameter);
         }
         else if (mode == "-ls") {
-            if (scheduler != nullptr) {
+            if (scheduler != nullptr)
                 scheduler->printActiveScreen();
-            }
             break;
         }
         else {
@@ -269,7 +270,6 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
     }
     /*
     case CMD_PROCESS_SMI: {
-        
         if (scheduler != nullptr)
             scheduler->printProcessSMI();
         break;

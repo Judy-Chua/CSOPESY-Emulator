@@ -24,10 +24,11 @@ private:
     int frameSize = 16;     // Frame size (16 bytes)
 
 public:
-    MemoryManager(int maxMemory, int memPerPoc, int frameSize, int availableMemory);
+    MemoryManager(int maxMemory, int memPerProc, int frameSize, int availableMemory);
     bool allocateMemory(int pid);
     bool isAllocated(int pid);
     void deallocateMemory(int pid);
+    void markIdle(int pid)
     void printMemoryLayout(int cycle) const;
     int getActiveProcessesCount() const;
     std::string getCurrentTime() const;
