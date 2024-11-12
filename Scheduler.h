@@ -34,9 +34,6 @@ public:
     void printProcessSMI();
     void printVmstat();
 
-    int getUsedCores();
-    float getCpuUtilization();
-
 private:
     void schedule();
     void generateProcess();
