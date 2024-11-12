@@ -43,28 +43,21 @@ bool MemoryManager::isAllocated(int pid) {
 
 // Deallocate memory when the process finishes
 void MemoryManager::deallocateMemory(int pid) {
-    for (auto& p : processes) {
-        if (p.pid == pid && !p.isRunning) {
-            int block = memPerProc;
-            int maxBlocks = maxMemory / block;
-
-            for (int i = 0; i < maxBlocks; ++i) {
-                if (memory[i] == pid) {
-                    memory[i] = -1;
-                    availableMemory += block;
-                }
-            }
-            p.active = false; // Mark process as deallocated
-            return;
+    int freedMemory = 0;
+    for (int i = 0; i < memory.size(); ++i) {
+        if (memory[i] == pid) {
+            memory[i] = -1;
+            freedMemory += memPerProc;
         }
     }
-}
 
-// Mark a process as idle when not running
-void MemoryManager::markIdle(int pid) {
+    availableMemory += freedMemory;
+
+    // Remove the process from the active list
     for (auto& p : processes) {
-        if (p.pid == pid && p.active) {
-            p.isRunning = false;
+        if (p.pid == pid) {
+            p.active = false;
+            break;
         }
     }
 }

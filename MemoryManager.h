@@ -28,7 +28,6 @@ public:
     bool allocateMemory(int pid);
     bool isAllocated(int pid);
     void deallocateMemory(int pid);
-    void markIdle(int pid)
     void printMemoryLayout(int cycle) const;
     int getActiveProcessesCount() const;
     std::string getCurrentTime() const;

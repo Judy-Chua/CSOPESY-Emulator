@@ -103,7 +103,7 @@ void Scheduler::scheduleFCFS() {
 
         bool assigned = false;
         for (int coreId = 0; coreId < numCores; ++coreId) {
-            if (memoryManager.getAvailableMemory() > 0) { // has available memory
+            if (memoryManager.getAvailableMemory() > 0 || memoryManager.isAllocated(process->getPID())) { // has available memory
                 if (coreAvailable[coreId]) {
                     process->setState(Process::RUNNING);
                     process->setCoreID(coreId);
@@ -119,12 +119,12 @@ void Scheduler::scheduleFCFS() {
                     assigned = true;
                     break;
                 }
-            }
-            else // no more memory
-                processQueue.push(process);
+            }                
         }
 
         if (!assigned) {
+            processQueue.pop();
+            processQueue.push(process);
             std::unique_lock<std::mutex> lock(queueMutex);
             cv.wait(lock, [this] {
                 return std::any_of(coreAvailable.begin(), coreAvailable.end(), [](bool available) { return available; });
