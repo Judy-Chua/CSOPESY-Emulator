@@ -38,6 +38,8 @@ private:
     void workerRR(int coreId, std::shared_ptr<Process> process);
     int countAvailCores();
 
+    int countAvailCoresRR();
+
     MemoryManager memoryManager;
 
     std::thread schedulerThread;

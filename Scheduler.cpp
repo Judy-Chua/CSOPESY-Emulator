@@ -247,11 +247,22 @@ void Scheduler::reportUtil() {
 }
 
 void Scheduler::screenInfo(std::ostream& shortcut) {
-    int runCtr = 0, finCtr = 0;
+    /*int runCtr = 0, finCtr = 0;
 
     shortcut << "CPU Utilization: " << getCpuUtilization() << "%" << std::endl;
     shortcut << "Cores used: " << getUsedCores() << std::endl;
-    shortcut << "Cores available: " << countAvailCores() << std::endl << std::endl;
+    shortcut << "Cores available: " << countAvailCores() << std::endl << std::endl;*/
+
+    int runCtr = 0, finCtr = 0, avail = countAvailCores();
+    if (type == "rr") {
+        avail = countAvailCoresRR();
+    }
+    int used = numCores - avail;
+    float percent = float(numCores - avail) / numCores * 100;
+
+    shortcut << "CPU Utilization: " << percent << "%" << std::endl;
+    shortcut << "Cores used: " << used << std::endl;
+    shortcut << "Cores available: " << avail << std::endl << std::endl;
     shortcut << "--------------------------------------------------\n";
     shortcut << "Running processes:\n";
 
@@ -329,26 +340,38 @@ void Scheduler::printVmstat() {
 
 
 int Scheduler::countAvailCores() {
-    int count = 0;
-    if (type == "rr") {
-        // count = 0;
-        {
-            std::lock_guard<std::mutex> lock(queueMutex);
-            for (int coreId = 0; coreId < numCores; ++coreId) {
-                if (coreAvailable[coreId]) { // Check if core is marked as available
-                    count++;
-                }
-            }
-        }
-    }
-    else { // fcfs
-        count = numCores;
+    //int count = 0;
+    //if (type == "rr") {
+    //    // count = 0;
+    //    {
+    //        std::lock_guard<std::mutex> lock(queueMutex);
+    //        for (int coreId = 0; coreId < numCores; ++coreId) {
+    //            if (coreAvailable[coreId]) { // Check if core is marked as available
+    //                count++;
+    //            }
+    //        }
+    //    }
+    //}
+    //else { // fcfs
+        int count = numCores;
         {
             std::lock_guard<std::mutex> lock(queueMutex);
             for (const auto& process : processes) { //more updated version instead of checking coresAvailable
                 if (process->getState() == Process::RUNNING && process->getCoreID() != -1) {
                     count--;
                 }
+            }
+        }
+    return count;
+}
+
+int Scheduler::countAvailCoresRR() {
+    int count = 0;
+    {
+        std::lock_guard<std::mutex> lock(queueMutex);
+        for (int coreId = 0; coreId < numCores; ++coreId) {
+            if (coreAvailable[coreId]) { // Check if core is marked as available
+                count++;
             }
         }
     }
