@@ -177,15 +177,15 @@ void Scheduler::scheduleRR() {
 
 // Worker function specific to RR scheduling
 void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
+    if (process == nullptr) {
+        return;
+    }
     if (process != nullptr && !process->getName().empty()) {
         process->setState(Process::RUNNING);
         process->setCoreID(coreId);
         int ctr = 0;
         
-        if (memoryManager.isAllocated(process->getPID())) {
-            memoryManager.setIdle(process->getPID(), false);    //basically do nothing
-        }
-        else {
+        if (!memoryManager.isAllocated(process->getPID())) {
             memoryManager.allocateMemory(process->getPID());
         }
         
@@ -204,7 +204,6 @@ void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
         if (!process->isFinished()) {   //process not yet done
             process->setState(Process::WAITING);
             process->setCoreID(-1);
-            memoryManager.setIdle(process->getPID(), true);
             processQueue.push(process);
         }
         else {  //already finished so deallocate

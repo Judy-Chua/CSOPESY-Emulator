@@ -23,35 +23,14 @@ bool MemoryManager::allocateMemory(int pid) {
     for (int i = 0; i < maxBlocks; ++i) {
         if (memory[i] == -1) {
             memory[i] = pid;
-            processes.push_back({ pid, i * block, (i + 1) * block - 1, true, false });
+            processes.push_back({ pid, i * block, (i + 1) * block - 1, true });
             availableMemory -= block;
             return true;
         }
     }
 
     // If allocation fails, calculate external fragmentation
-    int total = 0;
-    int largest = 0;
-    int current = 0;
-
-    for (int i = 0; i < maxBlocks; ++i) {
-        if (memory[i] == -1) {
-            total += block;
-            current += block;
-        }
-        else {
-            if (current > largest) {
-                largest = current;
-            }
-            current = 0;
-        }
-    }
-
-    if (current > largest) {
-        largest = current;
-    }
-
-    totalFragmentation += (total - largest);
+    totalFragmentation += block;
     return false;
 }
 
@@ -83,16 +62,6 @@ void MemoryManager::deallocateMemory(int pid) {
     for (auto& p : processes) {
         if (p.pid == pid) {
             p.active = false;
-            break;
-        }
-    }
-}
-
-// Mark a process as idle when not running
-void MemoryManager::setIdle(int pid, bool idle) {
-    for (auto& p : processes) {
-        if (p.pid == pid) {
-            p.isIdle = idle;
             break;
         }
     }
