@@ -18,21 +18,68 @@ MemoryManager::MemoryManager(int maxMemory, int memPerPoc, int frameSize, int av
 bool MemoryManager::allocateMemory(int pid) {
     int block = memPerProc;
     int maxBlocks = maxMemory / block;
+<<<<<<< Updated upstream
  
+=======
+
+>>>>>>> Stashed changes
     // First-fit algorithm to find the first block of free memory
     for (int i = 0; i < maxBlocks; ++i) {
         if (memory[i] == -1) {
             memory[i] = pid;
+<<<<<<< Updated upstream
             
             processes.push_back({ pid, i * block, (i + 1) * block - 1, true });
+=======
+
+            processes.push_back({ pid, i * block, (i + 1) * block - 1, true, false });
+>>>>>>> Stashed changes
             availableMemory -= block;
             return true;
         }
     }
 
     // If allocation fails, calculate external fragmentation
+<<<<<<< Updated upstream
     totalFragmentation = maxMemory - block;
     return false;
+=======
+    int total = 0;
+    int largest = 0;
+    int current = 0;
+
+    for (int i = 0; i < maxBlocks; ++i) {
+        if (memory[i] == -1) {
+            total += block;
+            current += block;
+        }
+        else {
+            if (current > largest) {
+                largest = current;
+            }
+            current = 0;
+        }
+    }
+
+    if (current > largest) {
+        largest = current;
+    }
+
+    totalFragmentation += (total - largest);
+    return false;
+}
+
+// Returns if process is already in the memory or not
+bool MemoryManager::isAllocated(int pid) {
+    bool allocated = false;
+    for (int i = 0; i < memory.size(); ++i) {
+        if (memory[i] == pid) {
+            allocated = true;
+            break;
+        }
+    }
+    return allocated;
+>>>>>>> Stashed changes
 }
 
 // Deallocate memory when the process finishes
@@ -56,7 +103,21 @@ void MemoryManager::deallocateMemory(int pid) {
     }
 }
 
+<<<<<<< Updated upstream
 // Print memory layout, timestamp, process details, and fragmentation status
+=======
+// Mark a process as idle when not running
+void MemoryManager::setIdle(int pid, bool idle) {
+    for (auto& p : processes) {
+        if (p.pid == pid) {
+            p.isIdle = idle;
+            break;
+        }
+    }
+}
+
+// Print memory layout every quantum cycle
+>>>>>>> Stashed changes
 void MemoryManager::printMemoryLayout(int cycle) const {
     std::ofstream file("memory\\memory_stamp_" + std::to_string(cycle) + ".txt");
     file << "Timestamp: " << getCurrentTime() << "\n";
@@ -72,7 +133,7 @@ void MemoryManager::printMemoryLayout(int cycle) const {
         }
         
     }
-    file << "\n----start---- = 0\n";
+    file << "----start---- = 0\n";
     file.close();
 }
 

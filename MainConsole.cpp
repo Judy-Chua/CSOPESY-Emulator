@@ -267,6 +267,21 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
         scheduler->reportUtil();
         break;
     }
+<<<<<<< Updated upstream
+=======
+    case CMD_PROCESS_SMI: {
+        /*
+        if (scheduler != nullptr)
+            scheduler->printProcessSMI();*/
+        break;
+    }
+    case CMD_VMSTAT: {
+        /*
+        if (scheduler != nullptr)
+            scheduler->printVmstat();*/
+        break;
+    }
+>>>>>>> Stashed changes
     case CMD_CLEAR: {
         system("cls");  // Clear the screen
         display();

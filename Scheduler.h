@@ -18,12 +18,21 @@ public:
     void stopScheduler();
     void printActiveScreen();
     void reportUtil();
-    void screenInfo(std::ostream& shortcut);
+    void screenInfo(std::ostream& shortcut, bool erm);
 
     void scheduleFCFS();
     void scheduleRR();
 
     int generateRandomNumber();
+<<<<<<< Updated upstream
+=======
+    /*
+    void printProcessSMI();
+    void printVmstat();*/
+
+    int getUsedCores();
+    float getCpuUtilization();
+>>>>>>> Stashed changes
 
 private:
     void schedule();
