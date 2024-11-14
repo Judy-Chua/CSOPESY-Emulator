@@ -1,3 +1,8 @@
+to debug:
+change all mem-per-proc kasi sa specs its just min-mem-per-proc and max-mem-per-proc
+fix the cpu utilization
+
+----------------------------------
 working code
 >did not use BackingStore and FlatMemoryAllocator codes kasi time consuming
  pero inupload ko na rin tho need pa yun ng editing

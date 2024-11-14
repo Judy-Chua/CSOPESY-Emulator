@@ -13,11 +13,11 @@
 
 using namespace std;
 
-Scheduler::Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay, int memMax, int memFrame, int memProc) :
+Scheduler::Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay, int memMax, int memFrame, int minMemProc, int maxMemProc) :
     numCores(numCores), type(type), coreAvailable(numCores, true), workers(numCores),
     timeSlice(timeSlice), batchFreq(freq), minIns(min), maxIns(max), delaysPerExec(delay),
-    maxOverallMem(memMax), memPerFrame(memFrame), memPerProc(memProc), cpu(0),
-    memoryManager(memMax, memProc, memFrame, memMax) {}
+    maxOverallMem(memMax), memPerFrame(memFrame), minMemPerProc(minMemProc), maxMemPerProc(maxMemProc), cpu(0),
+    memoryManager(memMax, memFrame, minMemProc, maxMemProc, memMax) {}
 
 void Scheduler::addProcess(std::shared_ptr<Process> process) {
     std::lock_guard<std::mutex> lock(queueMutex);
@@ -300,7 +300,6 @@ int Scheduler::generateRandomNumber() {
     return distr(generate);
 }
 
-/*
 void Scheduler::printProcessSMI() {
     std::cout << "----------------------------------------------" << std::endl;
     std::cout << "| PROCESS-SMI vxx.xx Driver Version: xx.xx |" << std::endl;
@@ -316,17 +315,15 @@ void Scheduler::printProcessSMI() {
 }
 
 void Scheduler::printVmstat() {
-    std::cout << memoryManager.getMaxMemory() << "\t K total memory" << std::endl;
-    std::cout << memoryManager.getUsedMemory() << "\t K used memory" << std::endl;
-    std::cout << memoryManager.getAvailableMemory() << "\t K free memory" << std::endl;
-    std::cout << "xxxxxxxx\t K idle cpu ticks" << std::endl;
-    std::cout << "xxxxxxxx\t K active cpu ticks" << std::endl;
-    std::cout << "xxxxxxxx\t K total cpu ticks" << std::endl;
-    std::cout << "xxxxxxxx\t K num paged in" << std::endl;
-    std::cout << "xxxxxxxx\t K num paged out" << std::endl << std::endl;
+    std::cout << makeSpaces(memoryManager.getMaxMemory()) << " K total memory" << std::endl;
+    std::cout << makeSpaces(memoryManager.getUsedMemory()) << " K used memory" << std::endl;
+    std::cout << makeSpaces(memoryManager.getAvailableMemory()) << " K free memory" << std::endl;
+    std::cout << "xxxxxxxxxx K idle cpu ticks" << std::endl;
+    std::cout << "xxxxxxxxxx K active cpu ticks" << std::endl;
+    std::cout << "xxxxxxxxxx K total cpu ticks" << std::endl;
+    std::cout << "xxxxxxxxxx K num paged in" << std::endl;
+    std::cout << "xxxxxxxxxx K num paged out" << std::endl << std::endl;
 }
-*/
-
 
 int Scheduler::countAvailCores() {
     int count = 0;
@@ -366,4 +363,16 @@ float Scheduler::getCpuUtilization() {
     float percent = float(used) / numCores * 100;
 
     return percent;
+}
+
+std::string Scheduler::makeSpaces(int input) {
+    int origLength = std::to_string(input).length();
+    std::string newString;
+    for (int i = 0; i < 10 - origLength; i++) {
+        newString += " ";
+    }
+
+    newString += std::to_string(input);
+
+    return newString;
 }

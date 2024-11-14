@@ -5,9 +5,9 @@
 #include <fstream>
 #include <ctime>
 // Constructor: Initialize memory with -1 (indicating free space)
-MemoryManager::MemoryManager(int maxMemory, int memPerProc, int frameSize, int availableMemory)
-    : memory(maxMemory / memPerProc, -1), maxMemory(maxMemory), memPerProc(memPerProc),
-    frameSize(frameSize), availableMemory(availableMemory) {}
+MemoryManager::MemoryManager(int maxMemory, int frameSize, int minMemProc, int maxMemProc, int availableMemory)
+    : memory(maxMemory / memPerProc, -1), maxMemory(maxMemory), frameSize(frameSize), minMemPerProc(minMemProc),
+    maxMemPerProc(maxMemProc), availableMemory(availableMemory) {}
 
 // First-fit memory allocation
 bool MemoryManager::allocateMemory(int pid) {
@@ -109,3 +109,16 @@ void MemoryManager::setAvailableMemory(int free) {
     this->availableMemory = free;
 }
 
+int MemoryManager::getMaxMemory() const {
+    return maxMemory;
+}
+
+int MemoryManager::getUsedMemory() const {
+    return getMaxMemory() - getAvailableMemory();
+}
+
+float MemoryManager::getMemoryUtil() const {
+    int used = getUsedMemory();
+    float util = float(used) / getMaxMemory() * 100;
+    return util;
+}

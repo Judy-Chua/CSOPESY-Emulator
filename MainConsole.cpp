@@ -74,7 +74,6 @@ struct Config {
     int delayPerExec = 0;
     int maxOverallMem = 2;
     int memPerFrame = 2;
-    int memPerProc = 4096; // CHANGE AFTER THE ACTIVITY
     int minMemPerProc = 2;
     int maxMemPerProc = 2;
 };
@@ -121,9 +120,6 @@ Config readConfig(const std::string& filename) {
         } else if (line.find("mem-per-frame") != std::string::npos) {
             iss >> key >> value;
             config.memPerFrame = value;
-        } else if (line.find("mem-per-proc") != std::string::npos) {  // CHANGE AFTER THE ACTIVITY
-            iss >> key >> value;
-            config.memPerProc = value;
         } else if (line.find("min-mem-per-proc") != std::string::npos) {
             iss >> key >> value;
             config.minMemPerProc = value;
@@ -144,7 +140,7 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
         if (scheduler == nullptr) {
             scheduler = new Scheduler(config.numCpu, config.scheduler, config.quantumCycles,
                 config.batchProcessFreq, config.minIns, config.maxIns, config.delayPerExec,
-                config.maxOverallMem, config.memPerFrame, config.memPerProc);
+                config.maxOverallMem, config.memPerFrame, config.minMemPerProc, config.maxMemPerProc);
             scheduler->startScheduling();
             ConsoleManager::getInstance()->setScheduler(scheduler);
             isInitialized = true;
@@ -166,7 +162,8 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
             std::cout << "Memory settings set to:" << std::endl;
             std::cout << "   Maximum Memory Available      - " << config.maxOverallMem << std::endl;
             std::cout << "   Memory Size per Frame         - " << config.memPerFrame << std::endl;
-            std::cout << "   Memory Size per Process       - " << config.memPerProc << std::endl << std::endl;
+            std::cout << "   Minimum Size per Process      - " << config.minMemPerProc << std::endl;
+            std::cout << "   Maximum Size Per Process      - " << config.maxMemPerProc << std::endl << std::endl;
 
             x = config.batchProcessFreq;
         }
@@ -268,7 +265,6 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
         scheduler->reportUtil();
         break;
     }
-    /*
     case CMD_PROCESS_SMI: {
         if (scheduler != nullptr)
             scheduler->printProcessSMI();
@@ -278,7 +274,7 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
         if (scheduler != nullptr)
             scheduler->printVmstat();
         break;
-    }*/
+    }
     case CMD_CLEAR: {
         system("cls");  // Clear the screen
         display();

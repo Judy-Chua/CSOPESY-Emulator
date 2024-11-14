@@ -22,9 +22,11 @@ private:
     int maxMemory = 16384;  // Total memory available (16KB)
     int memPerProc = 4096; // Memory required per process (4KB)
     int frameSize = 16;     // Frame size (16 bytes)
+    int minMemPerProc = -1;
+    int maxMemPerProc = -1;
 
 public:
-    MemoryManager(int maxMemory, int memPerProc, int frameSize, int availableMemory);
+    MemoryManager(int maxMemory, int frameSize, int minMemPerProc, int maxMemPerProc, int availableMemory);
     bool allocateMemory(int pid);
     bool isAllocated(int pid);
     void deallocateMemory(int pid);
@@ -33,8 +35,8 @@ public:
     std::string getCurrentTime() const;
     int getAvailableMemory() const;
     void setAvailableMemory(int free);
-    /*
+
     int getMaxMemory() const;
     int getUsedMemory() const;
-    float getMemoryUtil() const; */
+    float getMemoryUtil() const;
 };
