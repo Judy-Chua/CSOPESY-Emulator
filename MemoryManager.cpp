@@ -5,29 +5,74 @@
 #include <fstream>
 #include <ctime>
 // Constructor: Initialize memory with -1 (indicating free space)
-MemoryManager::MemoryManager(int maxMemory, int memPerProc, int frameSize, int availableMemory)
-    : memory(maxMemory / memPerProc, -1), maxMemory(maxMemory), memPerProc(memPerProc),
-    frameSize(frameSize), availableMemory(availableMemory) {}
+MemoryManager::MemoryManager(int maxMemory, int frameSize, int availableMemory)
+    : memory(maxMemory / frameSize, -1), maxMemory(maxMemory), frameSize(frameSize),
+      availableMemory(availableMemory) {
+    if (maxMemory == frameSize) {
+        memType = "flat";
+    }
+    else {
+        memType = "paging";
+    }
+}
 
-// First-fit memory allocation
-bool MemoryManager::allocateMemory(int pid) {
-    int block = memPerProc;
-    int maxBlocks = maxMemory / block;
 
+bool MemoryManager::allocate(int pid) {
+    if (memType == "flat") {
+        return flatAllocate(pid);
+    }
+    
+    return pagingAllocate(pid);
+}
+
+
+// Flat memory allocation
+bool MemoryManager::flatAllocate(int pid) { //NEEDS FIXING
+    
     // First-fit algorithm to find the first block of free memory
-    for (int i = 0; i < maxBlocks; ++i) {
+    for (int i = 0; i < memory.size(); ++i) {
         if (memory[i] == -1) {
             memory[i] = pid;
-            processes.push_back({ pid, i * block, (i + 1) * block - 1, true });
-            availableMemory -= block;
+            processes.push_back({ pid, i, processMemory, true });
+            availableMemory -= processMemory;
             return true;
         }
     }
 
     // If allocation fails, calculate external fragmentation
-    totalFragmentation += block;
+    totalFragmentation = maxMemory - processMemory;
     return false;
 }
+
+// Paging memory allocation
+bool MemoryManager::pagingAllocate(int pid) {   //NEED FIXING PERO GOOD START ETO
+    int requiredFrames = maxMemory / frameSize;
+    int freeFrames = 0;
+    int start = -1;
+
+    for (int i = 0; i < memory.size(); ++i) {
+        if (memory[i] == -1) {
+            if (start == -1) start = i;
+            ++freeFrames;
+            if (freeFrames == requiredFrames) {
+                for (int j = start; j < start + requiredFrames; ++j) {
+                    memory[j] = pid;
+                }
+                processes.push_back({ pid, start * frameSize, (start + requiredFrames) * frameSize - 1, true });
+                return true;
+            }
+        }
+        else {
+            freeFrames = 0;
+            start = -1;
+        }
+    }
+
+    // If allocation fails, calculate external fragmentation
+    totalFragmentation = maxMemory - (processes.size() * processMemory);
+    return false;
+}
+
 
 // Returns if process is already in the memory or not
 bool MemoryManager::isAllocated(int pid) {
@@ -109,3 +154,16 @@ void MemoryManager::setAvailableMemory(int free) {
     this->availableMemory = free;
 }
 
+int MemoryManager::getMaxMemory() const {
+    return maxMemory;
+}
+
+int MemoryManager::getUsedMemory() const {
+    return getMaxMemory() - getAvailableMemory();
+}
+
+float MemoryManager::getMemoryUtil() const {
+    int used = getUsedMemory();
+    float util = float(used) / getMaxMemory() * 100;
+    return util;
+}

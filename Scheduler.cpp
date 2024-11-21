@@ -13,11 +13,12 @@
 
 using namespace std;
 
-Scheduler::Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay, int memMax, int memFrame, int memProc) :
+Scheduler::Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, 
+                     int delay, int memMax, int memFrame, int minMemProc, int maxMemProc) :
     numCores(numCores), type(type), coreAvailable(numCores, true), workers(numCores),
     timeSlice(timeSlice), batchFreq(freq), minIns(min), maxIns(max), delaysPerExec(delay),
-    maxOverallMem(memMax), memPerFrame(memFrame), memPerProc(memProc), cpu(0),
-    memoryManager(memMax, memProc, memFrame, memMax) {}
+    maxOverallMem(memMax), memPerFrame(memFrame), minMemPerProc(minMemProc), maxMemPerProc(maxMemProc), 
+    cpu(0), memoryManager(memMax, memFrame, memMax) {}
 
 void Scheduler::addProcess(std::shared_ptr<Process> process) {
     std::lock_guard<std::mutex> lock(queueMutex);
@@ -74,11 +75,12 @@ void Scheduler::generateProcess() {
         }
 
         if (cpu % batchFreq == 0) {
-            int random = generateRandomNumber();
+            int randomLines = generateRandomNumber(minIns, maxIns);
+            int randomMem = generateRandomNumber(minMemPerProc, maxMemPerProc);
             int lastPID = ConsoleManager::getInstance()->getCurrentPID() + 1;
             string initialName = "P";
             string newName = initialName + to_string(lastPID);
-            ConsoleManager::getInstance()->createProcess(newName, random);
+            ConsoleManager::getInstance()->createProcess(newName, randomLines, randomMem);
         }
         this_thread::sleep_for(chrono::milliseconds(10));
     }
@@ -186,7 +188,7 @@ void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
         int ctr = 0;
         
         if (!memoryManager.isAllocated(process->getPID())) {
-            memoryManager.allocateMemory(process->getPID());
+            memoryManager.allocate(process->getPID());
         }
         
         // Execute process within the time slice for RR
@@ -217,7 +219,7 @@ void Scheduler::worker(int coreId, std::shared_ptr<Process> process) {
     if (process != nullptr && !process->getName().empty()) {
         process->setStartTime();
 
-        memoryManager.allocateMemory(process->getPID());
+        memoryManager.allocate(process->getPID());
         // Process execution
         while (!process->isFinished() && process->getState() != Process::WAITING) {
             process->executeCommand(coreId);
@@ -247,22 +249,11 @@ void Scheduler::reportUtil() {
 }
 
 void Scheduler::screenInfo(std::ostream& shortcut) {
-    /*int runCtr = 0, finCtr = 0;
+    int runCtr = 0, finCtr = 0;
 
     shortcut << "CPU Utilization: " << getCpuUtilization() << "%" << std::endl;
     shortcut << "Cores used: " << getUsedCores() << std::endl;
-    shortcut << "Cores available: " << countAvailCores() << std::endl << std::endl;*/
-
-    int runCtr = 0, finCtr = 0, avail = countAvailCores();
-    if (type == "rr") {
-        avail = countAvailCoresRR();
-    }
-    int used = numCores - avail;
-    float percent = float(numCores - avail) / numCores * 100;
-
-    shortcut << "CPU Utilization: " << percent << "%" << std::endl;
-    shortcut << "Cores used: " << used << std::endl;
-    shortcut << "Cores available: " << avail << std::endl << std::endl;
+    shortcut << "Cores available: " << countAvailCores() << std::endl << std::endl;
     shortcut << "--------------------------------------------------\n";
     shortcut << "Running processes:\n";
 
@@ -304,14 +295,13 @@ void Scheduler::screenInfo(std::ostream& shortcut) {
     shortcut << "--------------------------------------------------\n\n";
 }
 
-int Scheduler::generateRandomNumber() {
+int Scheduler::generateRandomNumber(int min, int max) {
     random_device random;
     mt19937 generate(random());
-    uniform_int_distribution<> distr(minIns, maxIns);
+    uniform_int_distribution<> distr(min, max);
     return distr(generate);
 }
 
-/*
 void Scheduler::printProcessSMI() {
     std::cout << "----------------------------------------------" << std::endl;
     std::cout << "| PROCESS-SMI vxx.xx Driver Version: xx.xx |" << std::endl;
@@ -327,51 +317,37 @@ void Scheduler::printProcessSMI() {
 }
 
 void Scheduler::printVmstat() {
-    std::cout << memoryManager.getMaxMemory() << "\t K total memory" << std::endl;
-    std::cout << memoryManager.getUsedMemory() << "\t K used memory" << std::endl;
-    std::cout << memoryManager.getAvailableMemory() << "\t K free memory" << std::endl;
-    std::cout << "xxxxxxxx\t K idle cpu ticks" << std::endl;
-    std::cout << "xxxxxxxx\t K active cpu ticks" << std::endl;
-    std::cout << "xxxxxxxx\t K total cpu ticks" << std::endl;
-    std::cout << "xxxxxxxx\t K num paged in" << std::endl;
-    std::cout << "xxxxxxxx\t K num paged out" << std::endl << std::endl;
+    std::cout << makeSpaces(memoryManager.getMaxMemory()) << " K total memory" << std::endl;
+    std::cout << makeSpaces(memoryManager.getUsedMemory()) << " K used memory" << std::endl;
+    std::cout << makeSpaces(memoryManager.getAvailableMemory()) << " K free memory" << std::endl;
+    std::cout << "xxxxxxxxxx K idle cpu ticks" << std::endl;
+    std::cout << "xxxxxxxxxx K active cpu ticks" << std::endl;
+    std::cout << "xxxxxxxxxx K total cpu ticks" << std::endl;
+    std::cout << "xxxxxxxxxx K num paged in" << std::endl;
+    std::cout << "xxxxxxxxxx K num paged out" << std::endl << std::endl;
 }
-*/
-
 
 int Scheduler::countAvailCores() {
-    //int count = 0;
-    //if (type == "rr") {
-    //    // count = 0;
-    //    {
-    //        std::lock_guard<std::mutex> lock(queueMutex);
-    //        for (int coreId = 0; coreId < numCores; ++coreId) {
-    //            if (coreAvailable[coreId]) { // Check if core is marked as available
-    //                count++;
-    //            }
-    //        }
-    //    }
-    //}
-    //else { // fcfs
-        int count = numCores;
+    int count = 0;
+    if (type == "rr") {
+        // count = 0;
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            for (int coreId = 0; coreId < numCores; ++coreId) {
+                if (coreAvailable[coreId]) { // Check if core is marked as available
+                    count++;
+                }
+            }
+        }
+    }
+    else { // fcfs
+        count = numCores;
         {
             std::lock_guard<std::mutex> lock(queueMutex);
             for (const auto& process : processes) { //more updated version instead of checking coresAvailable
                 if (process->getState() == Process::RUNNING && process->getCoreID() != -1) {
                     count--;
                 }
-            }
-        }
-    return count;
-}
-
-int Scheduler::countAvailCoresRR() {
-    int count = 0;
-    {
-        std::lock_guard<std::mutex> lock(queueMutex);
-        for (int coreId = 0; coreId < numCores; ++coreId) {
-            if (coreAvailable[coreId]) { // Check if core is marked as available
-                count++;
             }
         }
     }
@@ -389,4 +365,16 @@ float Scheduler::getCpuUtilization() {
     float percent = float(used) / numCores * 100;
 
     return percent;
+}
+
+std::string Scheduler::makeSpaces(int input) {
+    int origLength = std::to_string(input).length();
+    std::string newString;
+    for (int i = 0; i < 10 - origLength; i++) {
+        newString += " ";
+    }
+
+    newString += std::to_string(input);
+
+    return newString;
 }

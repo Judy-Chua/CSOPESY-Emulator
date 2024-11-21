@@ -28,7 +28,7 @@ public:
 	HANDLE getConsoleHandle() const;
 	void setCursorPosition(int posX, int posY) const;
 
-	void createProcess(const std::string& processName, int lines);
+	void createProcess(const std::string& processName, int lines, int memory);
 	void setScheduler(Scheduler* scheduler);
 
 	int getCurrentPID() const;

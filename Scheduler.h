@@ -11,7 +11,7 @@
 
 class Scheduler {
 public:
-    Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay, int memMax, int memFrame, int memProc);
+    Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay, int memMax, int memFrame, int minMemProc, int maxMemProc);
     void addProcess(std::shared_ptr<Process> process);
     void startScheduling();
     void generateProcesses();
@@ -23,13 +23,15 @@ public:
     void scheduleFCFS();
     void scheduleRR();
 
-    int generateRandomNumber();
-    /*
+    int generateRandomNumber(int min, int max);
+
     void printProcessSMI();
-    void printVmstat();*/
+    void printVmstat();
 
     int getUsedCores();
     float getCpuUtilization();
+
+    std::string makeSpaces(int input);
 
 private:
     void schedule();
@@ -37,8 +39,6 @@ private:
     void worker(int coreId, std::shared_ptr<Process> process);
     void workerRR(int coreId, std::shared_ptr<Process> process);
     int countAvailCores();
-
-    int countAvailCoresRR();
 
     MemoryManager memoryManager;
 
@@ -58,7 +58,8 @@ private:
 
     int numCores, cpu;
     int timeSlice = 0;
-    int minIns, maxIns, batchFreq, delaysPerExec, maxOverallMem, memPerFrame, memPerProc;
+    int minIns, maxIns, batchFreq, delaysPerExec;
+    int maxOverallMem, memPerFrame, minMemPerProc, maxMemPerProc;
 };
 
 

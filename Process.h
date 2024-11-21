@@ -10,12 +10,13 @@ public:
 		READY, RUNNING, WAITING, FINISHED
 	};
 
-	Process(int pid, const std::string& name, int lines, const std::string& startTime);
+	Process(int pid, const std::string& name, int lines, const std::string& startTime, int memory);
 	bool isFinished() const;
 	int getPID() const;
 	int getCommandCounter() const;
 	int getLinesOfCode() const;
 	int getCoreID() const;
+	int getMemorySize() const;
 	ProcessState getState() const;
 	std::string getName() const;
 	std::string getStartTime() const;
@@ -32,7 +33,7 @@ private:
 	int pid;
 	std::string name;
 	int commandCounter;
-	int coreID;
+	int coreID, memorySize;
 
 	ProcessState currentState;
 	int linesOfCode = 0;
