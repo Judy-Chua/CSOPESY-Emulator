@@ -32,7 +32,7 @@ void MainConsole::display() {
     std::cout << "   TELOSA, Arwyn Gabrielle\n";
     std::cout << "   UY, Jasmine Louise\n";
     std::cout << "   VALENZUELA, Shanley\n\n";
-    std::cout << "\033[95mLast updated: " << "\033[93m11-08-2024\n";
+    std::cout << "\033[95mLast updated: " << "\033[93m11-22-2024\n";
     std::cout << "\033[97m------------------------------------------------\n\n";
 }
 

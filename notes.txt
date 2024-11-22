@@ -1,7 +1,7 @@
 to debug:
 change all mem-per-proc kasi sa specs its just min-mem-per-proc and max-mem-per-proc
 fix the cpu utilization
-
+not sure if need but added initialization requirement to the other commands
 ----------------------------------
 working code
 >did not use BackingStore and FlatMemoryAllocator codes kasi time consuming
