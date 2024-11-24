@@ -5,28 +5,75 @@
 #include <fstream>
 #include <ctime>
 // Constructor: Initialize memory with -1 (indicating free space)
-MemoryManager::MemoryManager(int maxMemory, int frameSize, int minMemProc, int maxMemProc, int availableMemory)
-    : memory(maxMemory / memPerProc, -1), maxMemory(maxMemory), frameSize(frameSize), minMemPerProc(minMemProc),
-    maxMemPerProc(maxMemProc), availableMemory(availableMemory) {}
+MemoryManager::MemoryManager(int maxMemory, int frameSize, int availableMemory)
+    : memory(maxMemory / frameSize, -1), maxMemory(maxMemory), frameSize(frameSize),
+    availableMemory(availableMemory) {
+    if (maxMemory == frameSize) {
+        memType = "flat";
+    }
+    else {
+        memType = "paging";
+    }
+}
+
+// allocate based on type
+bool MemoryManager::allocate(int pid, int processSize) {
+    for (auto& p : processes) {
+        if (p.active)
+            p.time++;
+    }
+
+    if (memType == "flat") {
+        return flatAllocate(pid, processSize);
+    }
+
+    return pagingAllocate(pid, processSize);   
+}
 
 // First-fit memory allocation
-bool MemoryManager::allocateMemory(int pid) {
-    int block = memPerProc;
-    int maxBlocks = maxMemory / block;
-
+bool MemoryManager::flatAllocate(int pid, int processSize) {
     // First-fit algorithm to find the first block of free memory
-    for (int i = 0; i < maxBlocks; ++i) {
-        if (memory[i] == -1) {
-            memory[i] = pid;
-            processes.push_back({ pid, i * block, (i + 1) * block - 1, true });
-            availableMemory -= block;
-            return true;
+    if (availableMemory > processSize) {
+        processes.push_back({ pid, processSize, true, 1 }); // Record process information
+        return true;
+    } else { // If allocation fails, reallocate by removing oldest process
+        deallocateOldest();
+        flatAllocate(pid, processSize);
+    }
+    return false;
+}
+
+// Paging memory allocation
+bool MemoryManager::pagingAllocate(int pid, int processSize) {
+    int requiredFrames = (processSize + frameSize - 1) / frameSize; // Calculate the number of frames needed (ceil division)
+    int freeFrames = 0;
+    int frameCtr = 0;
+    std::vector<int> listOfFrames;
+
+    for (int i = 0; i < memory.size(); ++i) {
+        if (memory[i] == -1) { // Frame is free
+            listOfFrames.push_back(i);
+            ++freeFrames;
+            if (freeFrames == requiredFrames) { // Enough frames found
+                for (int j = 0; j < memory.size(); ++j) {
+                    if (listOfFrames[frameCtr] == j) {
+                        memory[j] = pid; // Allocate frames to the process
+                        frameCtr++;
+                    }
+                }
+
+                processes.push_back({ pid, processSize, true, 1 }); // Record process information
+                    // Process ID, Process Size, Allocation status, time
+                return true; // Allocation successful
+            }
         }
     }
 
-    // If allocation fails, calculate external fragmentation
-    totalFragmentation += block;
-    return false;
+    // If allocation fails, reallocate by removing oldest process
+    if (freeFrames != requiredFrames) {
+        deallocateOldest();
+        pagingAllocate(pid, processSize);
+    }
 }
 
 // Returns if process is already in the memory or not
@@ -41,13 +88,29 @@ bool MemoryManager::isAllocated(int pid) {
     return allocated;
 }
 
+void MemoryManager::deallocateOldest() {
+    int highest = 0;
+    int oldestProcess = 0;
+
+    for (auto& p : processes) {
+        if (p.time > highest) {
+            highest = p.time;
+            oldestProcess = p.pid;
+        }
+    }
+
+    //backing store code here (already existing in mco2-draft)
+    
+    deallocateMemory(oldestProcess);
+}
+
 // Deallocate memory when the process finishes
 void MemoryManager::deallocateMemory(int pid) {
     int freedMemory = 0;
     for (int i = 0; i < memory.size(); ++i) {
         if (memory[i] == pid) {
             memory[i] = -1;
-            freedMemory += memPerProc;
+            freedMemory += frameSize;
         }
     }
 
@@ -60,37 +123,6 @@ void MemoryManager::deallocateMemory(int pid) {
             break;
         }
     }
-}
-
-// Print memory layout every quantum cycle
-void MemoryManager::printMemoryLayout(int cycle) const {
-    std::ofstream file("memory\\memory_stamp_" + std::to_string(cycle) + ".txt");
-    file << "Timestamp: " << getCurrentTime() << "\n";
-    file << "Number of processes in memory: " << getActiveProcessesCount() << "\n";
-    file << "Total external fragmentation in KB: " << totalFragmentation / 1024 << "\n\n";
-
-    file << "----end---- = " << maxMemory << "\n\n";
-    for (const auto& p : processes) {
-        if (p.active) {
-            file << p.memoryEnd << "\n";
-            file << "P" << p.pid << "\n";
-            file << p.memoryStart << "\n\n";
-        }
-    }
-    file << "----start---- = 0\n";
-    file.close();
-}
-
-// Get the current timestamp
-std::string MemoryManager::getCurrentTime() const {
-    auto now = std::chrono::system_clock::now();
-    time_t currentTime = std::chrono::system_clock::to_time_t(now);
-    struct tm buf;
-    localtime_s(&buf, &currentTime);
-
-    char timeStr[100];
-    strftime(timeStr, sizeof(timeStr), "%m/%d/%Y %I:%M:%S %p", &buf);
-    return timeStr;
 }
 
 int MemoryManager::getActiveProcessesCount() const {
