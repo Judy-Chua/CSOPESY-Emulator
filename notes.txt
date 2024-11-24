@@ -1,3 +1,9 @@
+NOTE (11/24/2024):
+>>did not update scheduler files (and other files) yet kasi need ichange yung worker, add process, etc pero u can refer to mco2-draft for more information
+>>min-mem and max-mem is already considered sa scheduler files in mco2-draft
+>>may BackingStore and Worker files na ako sa mco2-draft so u guys can change anything if u think kulang (still unfinished)
+>>will continue this tomorrow (11/25/2024)
+
 to debug:
 change all mem-per-proc kasi sa specs its just min-mem-per-proc and max-mem-per-proc
 fix the cpu utilization
