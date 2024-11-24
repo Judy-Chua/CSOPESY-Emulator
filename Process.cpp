@@ -8,7 +8,7 @@
 
 using namespace std;
 
-Process::Process(int pid, const std::string& name, int lines, const std::string& startTime) {
+Process::Process(int pid, const std::string& name, int lines, const std::string& startTime, int memory) {
     this->pid = pid;
     this->name = name;
     this->currentState = READY;
@@ -16,6 +16,7 @@ Process::Process(int pid, const std::string& name, int lines, const std::string&
     this->linesOfCode = lines;
     this->coreID = -1;
     this->startTime = startTime;
+    this->memorySize = memory;
     command = new PrintCommand(name);
 }
 
@@ -107,4 +108,8 @@ std::string Process::getEndTime() const {
 
 int Process::getCoreID() const {
     return coreID;
+}
+
+int Process::getMemorySize() const {
+    return memorySize;
 }
