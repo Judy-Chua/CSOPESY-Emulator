@@ -24,6 +24,7 @@ bool MemoryManager::allocate(std::shared_ptr<Process> process) {
         if (p.active == "running")
             p.time++;
     }
+     
     bs.addProcess(process, process->getPID());
 
     if (memType == "flat") {
@@ -37,21 +38,36 @@ bool MemoryManager::flatAllocate(int pid, int processSize) {
     // First-fit algorithm to find the first block of free memory
 
     if (isAllocatedIdle(pid)) {
+        //std::cout << "already allocated process and idle " << pid << std::endl;
         setStatus(pid, "running");
         return true;
     }
     
     if (availableMemory >= processSize) {
-        processes.push_back({ pid, processSize, "running", 1}); // Record process information
+        //std::cout << "Allocating process since free " << pid << std::endl;
+        bool existing = false;
+        for (auto& p : processes) {
+            if (p.pid == pid && p.active == "removed") {
+                p.active = "running";
+                existing = true;
+                break;
+            }
+        }
+        if (!existing) {
+            processes.push_back({ pid, processSize, "running", 1 }); // Record process information
+        }
         availableMemory -= processSize;
-        //std::cout << "recorded " << pid << " so available memory now is " << availableMemory << std::endl;
+        //std::cout << "available memory now is " << availableMemory << std::endl;
         return true;
     } 
     
     if (!isAllRunning()) { // If allocation fails, reallocate by removing oldest process
+        std::cout << "deallocate process " << pid << std::endl;
         deallocateOldest();
         flatAllocate(pid, processSize);
     }
+
+    //std::cout << "all processes are running " << pid << std::endl;
     return false;
 }
 
@@ -94,6 +110,10 @@ bool MemoryManager::pagingAllocate(int pid, int processSize) {
 bool MemoryManager::isAllocated(int pid) {
     bool allocated = false;
     for (auto& p : processes) {
+        if (p.pid == pid && p.active == "removed") {
+            return false;
+        }
+
         if (p.pid == pid && (p.active == "running" || p.active == "idle")) {
             allocated = true;
             break;
@@ -114,14 +134,18 @@ bool MemoryManager::isAllocatedIdle(int pid) {
 }
 
 bool MemoryManager::isAllRunning() {
-    bool running = true;
+    int count = 0;
+    int numCtr = 0;
     for (auto& p : processes) {
-        if (p.active != "running") {
-            running = false;
-            break;
+        count++;
+        if (p.active == "running") {
+            numCtr++;
+        }
+        if (p.active == "removed") {
+            count--;
         }
     }
-    return running;
+    return (count == numCtr);
 }
 
 void MemoryManager::setStatus(int pid, const std::string& status) {
@@ -138,14 +162,13 @@ void MemoryManager::deallocateOldest() {
     int highest = 0;
     int oldestProcess = 0;
 
-    std::cout << "deallocating lowest since no space " << std::endl;
     for (auto& p : processes) {
         if (p.time > highest && p.active == "idle") {
             highest = p.time;
             oldestProcess = p.pid;
         }
     }
-    std::cout << "oldestprocess is " << oldestProcess << std::endl;
+    //std::cout << "backing store " << oldestProcess << std::endl;
     bs.storeProcess(oldestProcess);     //backing store
     deallocateMemory(oldestProcess);    //deallocate now
 }
@@ -173,7 +196,7 @@ void MemoryManager::deallocateMemory(int pid) {
     }
    
     availableMemory += freedMemory;
-    std::cout << "deallocated process " << pid << " so available memory now is " << availableMemory << std::endl;
+    //std::cout << "deallocated " << pid << " " << freedMemory << " so " << availableMemory << std::endl;
 
     // Remove the process from the active list
     for (auto& p : processes) {

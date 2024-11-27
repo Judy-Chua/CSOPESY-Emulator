@@ -7,7 +7,10 @@
 BackingStore::BackingStore() {}
 
 void BackingStore::addProcess(std::shared_ptr<Process> process, int pid) {
-    processStore[pid] = process;
+    if (processStore.find(pid) == processStore.end()) {
+        std::cout << "Allocating process " << process->getPID() << " of size " << process->getMemorySize() << " bytes" << std::endl;
+        processStore[pid] = process;
+    }
 }
 
 std::shared_ptr<Process> BackingStore::getProcess(int pid) {
@@ -26,10 +29,9 @@ void BackingStore::removeProcess(int pid) {
 void BackingStore::storeProcess(int pid) {
     std::ofstream outFile;
 
-    outFile.open("backing-store.txt", std::ios::app);
+    outFile.open("backing-store.txt", std::ios::app); //append
 
     if (outFile.is_open()) {
-        std::cout << "storing is " << pid << std::endl;
         auto now = std::chrono::system_clock::now();
         time_t currentTime = std::chrono::system_clock::to_time_t(now);
         struct tm buf;
@@ -37,8 +39,8 @@ void BackingStore::storeProcess(int pid) {
         char timeStr[100];
         strftime(timeStr, sizeof(timeStr), "%m/%d/%Y %I:%M:%S %p", &buf);
 
-        outFile << processStore[pid]->getName() << " " << pid << " "
-            << processStore[pid]->getCommandCounter() << " / "
+        outFile << processStore[pid]->getName() << "  |  " << pid << "  |  "
+            << processStore[pid]->getCommandCounter() << "/"
             << processStore[pid]->getLinesOfCode() << " ("
             << timeStr << ")\n";
 

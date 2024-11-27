@@ -7,6 +7,7 @@
 #include <vector>
 #include <string>
 #include <condition_variable>
+#include <atomic>
 
 
 class Scheduler {
@@ -35,6 +36,12 @@ public:
 
     std::string makeSpaces(int input);
 
+    void startTicks();
+    long long getActiveTicks();
+    void incrementTicks(long long ticks);
+    long long getIdleTicks();
+    void incrementIdleTicks(long long ticks);
+
 private:
     void schedule();
     void generateProcess();
@@ -46,11 +53,13 @@ private:
 
     std::thread schedulerThread;
     std::thread generateProcessThread;
+    std::thread ticksThread;
     std::thread printThread;
     std::vector<std::shared_ptr<Process>> processes;
     std::queue<std::shared_ptr<Process>> processQueue;
     std::vector<std::thread> workers;
     std::mutex queueMutex;
+    std::mutex cpuMutex;
     std::condition_variable cv;
     bool stop = false;
     bool stopPrinting = false;
@@ -58,7 +67,9 @@ private:
     std::string type;
     std::vector<bool> coreAvailable;
 
-    int numCores, cpu;
+    //std::atomic<long long> activeTicks{ 0 };
+    //std::atomic<long long> idleTicks{ 0 };
+    int numCores;
     int timeSlice = 0;
     int minIns, maxIns, batchFreq, delaysPerExec;
     int maxOverallMem, memPerFrame, minMemPerProc, maxMemPerProc;

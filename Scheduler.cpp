@@ -16,7 +16,7 @@ using namespace std;
 Scheduler::Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay, int memMax, int memFrame, int minMemProc, int maxMemProc) :
     numCores(numCores), type(type), coreAvailable(numCores, true), workers(numCores),
     timeSlice(timeSlice), batchFreq(freq), minIns(min), maxIns(max), delaysPerExec(delay),
-    maxOverallMem(memMax), memPerFrame(memFrame), minMemPerProc(minMemProc), maxMemPerProc(maxMemProc), cpu(0),
+    maxOverallMem(memMax), memPerFrame(memFrame), minMemPerProc(minMemProc), maxMemPerProc(maxMemProc),
     memoryManager(memMax, memFrame, memMax), activeTicks(0), idleTicks(0) {}
 
 void Scheduler::addProcess(std::shared_ptr<Process> process) {
@@ -24,7 +24,8 @@ void Scheduler::addProcess(std::shared_ptr<Process> process) {
     process->setState(Process::READY); //set to READY first
     processes.push_back(process);
     processQueue.push(process);
-    cv.notify_one();
+    std::cout << "Process added to queue: " << process->getName() << std::endl;
+    cv.notify_all();
 }
 
 void Scheduler::startScheduling() {
@@ -33,6 +34,9 @@ void Scheduler::startScheduling() {
     stop = false;
     if (!schedulerThread.joinable()) {
         schedulerThread = std::thread(&Scheduler::schedule, this);
+    }
+    if (!ticksThread.joinable()) {
+        ticksThread = std::thread(&Scheduler::startTicks, this);
     }
 }
 
@@ -70,19 +74,23 @@ void Scheduler::generateProcess() {
         {
             std::lock_guard<std::mutex> lock(queueMutex);
             if (stop) {
+                std::cout << "something triggered here " << std::endl;
                 break;  // Exit if stop is true
             }
         }
-
-        if (cpu % batchFreq == 0) {
+        
+        std::cout << "cpu now " << getActiveTicks() << " batchfreq " << batchFreq << std::endl;
+        if (getActiveTicks() % batchFreq == 0) {
             int random = generateRandomNumber(minIns, maxIns);
             int processMemory = generateMemory();
             int lastPID = ConsoleManager::getInstance()->getCurrentPID() + 1;
             string initialName = "P";
             string newName = initialName + to_string(lastPID);
+            std::cout << "Creating new process: " << newName << std::endl;
             ConsoleManager::getInstance()->createProcess(newName, random, processMemory);
         }
-        this_thread::sleep_for(chrono::milliseconds(delaysPerExec));
+        this_thread::sleep_for(std::chrono::milliseconds(1));
+        
     }
 }
 
@@ -155,10 +163,9 @@ void Scheduler::scheduleRR() {
                         //cannot be allocated
                         continue;
                     }
-                    std::cout << "***Allocated " << process->getPID() << std::endl;
-                    
+                    std::cout << "***Allocated " << process->getPID() << std::endl;  
                 }
-                std::cout << "Assigning to Core " << coreId << std::endl << std::endl;
+                std::cout << "Assigning to Core " << coreId << " for process " << process->getPID() << std::endl << std::endl;
                 coreAvailable[coreId] = false;
                 assigned = true;
                 processQueue.pop();
@@ -175,11 +182,15 @@ void Scheduler::scheduleRR() {
         if (!assigned) { //no memory or core so go back
             processQueue.pop();
             processQueue.push(process);
+            cv.wait(lock, [this] {
+                return std::any_of(coreAvailable.begin(), coreAvailable.end(), [](bool available) { return available; });
+                });
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
-    //lock.unlock();
-    //std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    lock.unlock();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 
 // Worker function specific to RR scheduling
@@ -196,26 +207,26 @@ void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
         while (ctr < timeSlice && !process->isFinished()) {
             process->executeCommand(coreId);
             ctr++;
-            cpu++;
-            activeTicks++;
-            if (cpu % timeSlice == 0 && cpu != 0) {
-                memoryManager.printMemoryLayout(cpu / timeSlice);
+            incrementTicks(1);
+            if (getActiveTicks() % timeSlice == 0 && getActiveTicks() != 0) {
+                std::cout << "cpu here is " << getActiveTicks() << std::endl;
+                memoryManager.printMemoryLayout(getActiveTicks() / timeSlice);
             }
 
             std::this_thread::sleep_for(chrono::milliseconds(delaysPerExec));
         }
         
         coreAvailable[coreId] = true;   //set to true now since done
-        if (!process->isFinished()) {   //process not yet done
+        if (!process->isFinished()) {
             process->setState(Process::WAITING);
             process->setCoreID(-1);
-            processQueue.push(process);
             memoryManager.setStatus(process->getPID(), "idle");
+            processQueue.push(process);
         }
-        else {  //already finished so deallocate
+        else {
             memoryManager.deallocateMemory(process->getPID());
         }
-        cv.notify_one(); // Notify scheduler of available core
+        cv.notify_all(); // Notify scheduler of available core
     }
 }
 
@@ -233,7 +244,7 @@ void Scheduler::worker(int coreId, std::shared_ptr<Process> process) {
         memoryManager.deallocateMemory(process->getPID());
         coreAvailable[coreId] = true;
 
-        cv.notify_one();  // Notify scheduler that a core is now available
+        cv.notify_all();  // Notify scheduler that a core is now available
     }
 }
 
@@ -336,13 +347,13 @@ void Scheduler::printProcessSMI() {
 }
 
 void Scheduler::printVmstat() {
-    //std::lock_guard<std::mutex> lock(queueMutex);
+    std::lock_guard<std::mutex> lock(queueMutex);
     std::cout << makeSpaces(memoryManager.getMaxMemory()) << " K total memory" << std::endl;
     std::cout << makeSpaces(memoryManager.getUsedMemory()) << " K used memory" << std::endl;
     std::cout << makeSpaces(memoryManager.getAvailableMemory()) << " K free memory" << std::endl;
-    std::cout << "xxxxxxxxxx K idle cpu ticks" << std::endl;
-    std::cout << "xxxxxxxxxx K active cpu ticks" << std::endl;
-    std::cout << "xxxxxxxxxx K total cpu ticks" << std::endl;
+    std::cout << idleTicks << " K idle cpu ticks" << std::endl;
+    std::cout << activeTicks << " K active cpu ticks" << std::endl;
+    std::cout << idleTicks + activeTicks << " K total cpu ticks" << std::endl;
     std::cout << "xxxxxxxxxx K num paged in" << std::endl;
     std::cout << "xxxxxxxxxx K num paged out" << std::endl << std::endl;
 }
@@ -407,4 +418,35 @@ std::string Scheduler::makeSpaces(int input) {
     newString += std::to_string(input);
 
     return newString;
+}
+
+void Scheduler::startTicks() {
+    while (true) {
+        for (int coreId = 0; coreId < numCores; ++coreId) {
+            if (coreAvailable[coreId] == false) {
+                idleTicks++;
+            }
+        }
+        std::this_thread::sleep_for(chrono::milliseconds(delaysPerExec));
+    }
+}
+
+long long Scheduler::getActiveTicks() {
+    std::lock_guard<std::mutex> lock(cpuMutex);
+    return activeTicks;
+}
+
+void Scheduler::incrementTicks(long long ticks) {
+    std::lock_guard<std::mutex> lock(cpuMutex);
+    activeTicks += ticks;
+}
+
+long long Scheduler::getIdleTicks() {
+    std::lock_guard<std::mutex> lock(cpuMutex);
+    return idleTicks;
+}
+
+void Scheduler::incrementIdleTicks(long long ticks) {
+    std::lock_guard<std::mutex> lock(cpuMutex);
+    idleTicks += ticks;
 }
