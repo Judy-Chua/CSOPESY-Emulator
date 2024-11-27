@@ -24,6 +24,8 @@ public:
     void scheduleRR();
 
     int generateRandomNumber(int min, int max);
+    int generateInstructions();
+    int generateMemory();
 
     void printProcessSMI();
     void printVmstat();
@@ -60,6 +62,8 @@ private:
     int timeSlice = 0;
     int minIns, maxIns, batchFreq, delaysPerExec;
     int maxOverallMem, memPerFrame, minMemPerProc, maxMemPerProc;
+
+    long long activeTicks, idleTicks;
 };
 
 

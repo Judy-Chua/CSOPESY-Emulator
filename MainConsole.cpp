@@ -32,7 +32,7 @@ void MainConsole::display() {
     std::cout << "   TELOSA, Arwyn Gabrielle\n";
     std::cout << "   UY, Jasmine Louise\n";
     std::cout << "   VALENZUELA, Shanley\n\n";
-    std::cout << "\033[95mLast updated: " << "\033[93m11-08-2024\n";
+    std::cout << "\033[95mLast updated: " << "\033[93m11-22-2024\n";
     std::cout << "\033[97m------------------------------------------------\n\n";
 }
 
@@ -212,9 +212,10 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
 
             std::cout << "Creating new screen: " << parameter << "\n" << std::endl;
 
-            int random = scheduler->generateRandomNumber();
+            int random = scheduler->generateInstructions();
+            int memory = scheduler->generateMemory();
 
-            ConsoleManager::getInstance()->createProcess(parameter, random);
+            ConsoleManager::getInstance()->createProcess(parameter, random, memory);
             ConsoleManager::getInstance()->switchConsole(parameter);
         }
         else if (mode == "-ls") {

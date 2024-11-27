@@ -1,4 +1,5 @@
 #include "MemoryManager.h"
+#include "BackingStore.h"
 #include <iostream>
 #include <sstream>
 #include <chrono>
@@ -7,7 +8,7 @@
 // Constructor: Initialize memory with -1 (indicating free space)
 MemoryManager::MemoryManager(int maxMemory, int frameSize, int availableMemory)
     : memory(maxMemory / frameSize, -1), maxMemory(maxMemory), frameSize(frameSize),
-      availableMemory(availableMemory) {
+    availableMemory(availableMemory) {
     if (maxMemory == frameSize) {
         memType = "flat";
     }
@@ -16,69 +17,84 @@ MemoryManager::MemoryManager(int maxMemory, int frameSize, int availableMemory)
     }
 }
 
-
-bool MemoryManager::allocate(int pid) {
-    if (memType == "flat") {
-        return flatAllocate(pid);
-    }
+// allocate based on type
+bool MemoryManager::allocate(std::shared_ptr<Process> process) {
     
-    return pagingAllocate(pid);
+    for (auto& p : processes) {
+        if (p.active == "running")
+            p.time++;
+    }
+    bs.addProcess(process, process->getPID());
+
+    if (memType == "flat") {
+        return flatAllocate(process->getPID(), process->getMemorySize());
+    }
+    return pagingAllocate(process->getPID(), process->getMemorySize());
 }
 
-
-// Flat memory allocation
-bool MemoryManager::flatAllocate(int pid) { //NEEDS FIXING
-    
+// First-fit memory allocation
+bool MemoryManager::flatAllocate(int pid, int processSize) {
     // First-fit algorithm to find the first block of free memory
-    for (int i = 0; i < memory.size(); ++i) {
-        if (memory[i] == -1) {
-            memory[i] = pid;
-            processes.push_back({ pid, i, processMemory, true });
-            availableMemory -= processMemory;
-            return true;
-        }
-    }
 
-    // If allocation fails, calculate external fragmentation
-    totalFragmentation = maxMemory - processMemory;
+    if (isAllocatedIdle(pid)) {
+        setStatus(pid, "running");
+        return true;
+    }
+    
+    if (availableMemory >= processSize) {
+        processes.push_back({ pid, processSize, "running", 1}); // Record process information
+        availableMemory -= processSize;
+        //std::cout << "recorded " << pid << " so available memory now is " << availableMemory << std::endl;
+        return true;
+    } 
+    
+    if (!isAllRunning()) { // If allocation fails, reallocate by removing oldest process
+        deallocateOldest();
+        flatAllocate(pid, processSize);
+    }
     return false;
 }
 
 // Paging memory allocation
-bool MemoryManager::pagingAllocate(int pid) {   //NEED FIXING PERO GOOD START ETO
-    int requiredFrames = maxMemory / frameSize;
+bool MemoryManager::pagingAllocate(int pid, int processSize) {
+    
+    int requiredFrames = (processSize + frameSize - 1) / frameSize; // Calculate the number of frames needed (ceil division)
     int freeFrames = 0;
-    int start = -1;
+    int frameCtr = 0;
+    std::vector<int> listOfFrames;
 
     for (int i = 0; i < memory.size(); ++i) {
-        if (memory[i] == -1) {
-            if (start == -1) start = i;
+        if (memory[i] == -1) { // Frame is free
+            listOfFrames.push_back(i);
             ++freeFrames;
-            if (freeFrames == requiredFrames) {
-                for (int j = start; j < start + requiredFrames; ++j) {
-                    memory[j] = pid;
+            if (freeFrames == requiredFrames) { // Enough frames found
+                for (int j = 0; j < memory.size(); ++j) {
+                    if (listOfFrames[frameCtr] == j) {
+                        memory[j] = pid; // Allocate frames to the process
+                        frameCtr++;
+                    }
                 }
-                processes.push_back({ pid, start * frameSize, (start + requiredFrames) * frameSize - 1, true });
-                return true;
+
+                processes.push_back({ pid, processSize, "running", 1}); // Record process information
+                    // Process ID, Process Size, Allocation status, time
+                return true; // Allocation successful
             }
-        }
-        else {
-            freeFrames = 0;
-            start = -1;
         }
     }
 
-    // If allocation fails, calculate external fragmentation
-    totalFragmentation = maxMemory - (processes.size() * processMemory);
+    // If allocation fails, reallocate by removing oldest process
+    if (!isAllRunning() && freeFrames != requiredFrames) {
+        deallocateOldest();
+        pagingAllocate(pid, processSize);
+    }
     return false;
 }
-
 
 // Returns if process is already in the memory or not
 bool MemoryManager::isAllocated(int pid) {
     bool allocated = false;
-    for (int i = 0; i < memory.size(); ++i) {
-        if (memory[i] == pid) {
+    for (auto& p : processes) {
+        if (p.pid == pid && (p.active == "running" || p.active == "idle")) {
             allocated = true;
             break;
         }
@@ -86,62 +102,120 @@ bool MemoryManager::isAllocated(int pid) {
     return allocated;
 }
 
-// Deallocate memory when the process finishes
-void MemoryManager::deallocateMemory(int pid) {
-    int freedMemory = 0;
-    for (int i = 0; i < memory.size(); ++i) {
-        if (memory[i] == pid) {
-            memory[i] = -1;
-            freedMemory += memPerProc;
+bool MemoryManager::isAllocatedIdle(int pid) {
+    bool allocated = false;
+    for (auto& p : processes) {
+        if (p.pid == pid && p.active == "idle") {
+            allocated = true;
+            break;
         }
     }
+    return allocated;
+}
 
-    availableMemory += freedMemory;
+bool MemoryManager::isAllRunning() {
+    bool running = true;
+    for (auto& p : processes) {
+        if (p.active != "running") {
+            running = false;
+            break;
+        }
+    }
+    return running;
+}
 
-    // Remove the process from the active list
+void MemoryManager::setStatus(int pid, const std::string& status) {
     for (auto& p : processes) {
         if (p.pid == pid) {
-            p.active = false;
+            p.active = status;
             break;
         }
     }
 }
 
-// Print memory layout every quantum cycle
+void MemoryManager::deallocateOldest() {
+    
+    int highest = 0;
+    int oldestProcess = 0;
+
+    std::cout << "deallocating lowest since no space " << std::endl;
+    for (auto& p : processes) {
+        if (p.time > highest && p.active == "idle") {
+            highest = p.time;
+            oldestProcess = p.pid;
+        }
+    }
+    std::cout << "oldestprocess is " << oldestProcess << std::endl;
+    bs.storeProcess(oldestProcess);     //backing store
+    deallocateMemory(oldestProcess);    //deallocate now
+}
+
+// Deallocate memory when the process finishes
+void MemoryManager::deallocateMemory(int pid) {
+    
+    int freedMemory = 0;
+
+    if (memType == "flat") {
+        for (auto& p : processes) {
+            if (p.pid == pid) {
+                freedMemory = p.memory;
+                break;
+            }
+        }
+    }
+    else {
+        for (int i = 0; i < memory.size(); ++i) {
+            if (memory[i] == pid) {
+                memory[i] = -1;
+                freedMemory += frameSize;
+            }
+        }
+    }
+   
+    availableMemory += freedMemory;
+    std::cout << "deallocated process " << pid << " so available memory now is " << availableMemory << std::endl;
+
+    // Remove the process from the active list
+    for (auto& p : processes) {
+        if (p.pid == pid) {
+            p.active = "removed";
+            break;
+        }
+    }
+}
+
 void MemoryManager::printMemoryLayout(int cycle) const {
     std::ofstream file("memory\\memory_stamp_" + std::to_string(cycle) + ".txt");
     file << "Timestamp: " << getCurrentTime() << "\n";
     file << "Number of processes in memory: " << getActiveProcessesCount() << "\n";
     file << "Total external fragmentation in KB: " << totalFragmentation / 1024 << "\n\n";
-
     file << "----end---- = " << maxMemory << "\n\n";
     for (const auto& p : processes) {
-        if (p.active) {
-            file << p.memoryEnd << "\n";
+        if (p.active == "running" || p.active == "idle") {
+            file << "status " << p.active << "\n";
             file << "P" << p.pid << "\n";
-            file << p.memoryStart << "\n\n";
+            file << p.memory << "\n\n";
         }
     }
     file << "----start---- = 0\n";
     file.close();
 }
-
 // Get the current timestamp
 std::string MemoryManager::getCurrentTime() const {
     auto now = std::chrono::system_clock::now();
     time_t currentTime = std::chrono::system_clock::to_time_t(now);
     struct tm buf;
     localtime_s(&buf, &currentTime);
-
     char timeStr[100];
     strftime(timeStr, sizeof(timeStr), "%m/%d/%Y %I:%M:%S %p", &buf);
     return timeStr;
 }
 
+
 int MemoryManager::getActiveProcessesCount() const {
     int count = 0;
     for (const auto& p : processes) {
-        if (p.active) ++count;
+        if (p.active == "running" || p.active == "idle") ++count;
     }
     return count;
 }
