@@ -19,10 +19,18 @@ MemoryManager::MemoryManager(int maxMemory, int frameSize, int availableMemory)
 
 // allocate based on type
 bool MemoryManager::allocate(std::shared_ptr<Process> process) {
-    
+    bool isExistingAndRunning = false;
     for (auto& p : processes) {
-        if (p.active == "running")
+        if (p.active == "running") {
             p.time++;
+			if (p.pid == process->getPID()) {
+				isExistingAndRunning = true;
+			}
+        }
+    }
+
+    if (isExistingAndRunning) {
+        return false;
     }
      
     bs.addProcess(process, process->getPID());
@@ -35,8 +43,6 @@ bool MemoryManager::allocate(std::shared_ptr<Process> process) {
 
 // First-fit memory allocation
 bool MemoryManager::flatAllocate(int pid, int processSize) {
-    // First-fit algorithm to find the first block of free memory
-
     if (isAllocatedIdle(pid)) {
         //std::cout << "already allocated process and idle " << pid << std::endl;
         setStatus(pid, "running");
@@ -73,14 +79,22 @@ bool MemoryManager::flatAllocate(int pid, int processSize) {
 
 // Paging memory allocation
 bool MemoryManager::pagingAllocate(int pid, int processSize) {
-    
     int requiredFrames = (processSize + frameSize - 1) / frameSize; // Calculate the number of frames needed (ceil division)
+    //std::cout << "paging allocate required frames " << requiredFrames << std::endl;
     int freeFrames = 0;
     int frameCtr = 0;
     std::vector<int> listOfFrames;
+    //std::cout << "memory size " << memory.size() << std::endl;
+
+    if (isAllocatedIdle(pid)) {
+        //std::cout << "already allocated process and idle " << pid << std::endl;
+        setStatus(pid, "running");
+        return true;
+    }
 
     for (int i = 0; i < memory.size(); ++i) {
         if (memory[i] == -1) { // Frame is free
+            //std::cout << "free frame " << i << std::endl;
             listOfFrames.push_back(i);
             ++freeFrames;
             if (freeFrames == requiredFrames) { // Enough frames found
@@ -88,14 +102,18 @@ bool MemoryManager::pagingAllocate(int pid, int processSize) {
                     if (listOfFrames[frameCtr] == j) {
                         memory[j] = pid; // Allocate frames to the process
                         frameCtr++;
+                        if (frameCtr == listOfFrames.size()) {
+                            break;
+                        }
                     }
                 }
-
+                availableMemory -= processSize;
                 numPagedIn += requiredFrames;
                 processes.push_back({ pid, processSize, "running", 1}); // Record process information
                     // Process ID, Process Size, Allocation status, time
                 return true; // Allocation successful
             }
+            //std::cout << "total now " << i << std::endl;
         }
     }
 
@@ -159,7 +177,6 @@ void MemoryManager::setStatus(int pid, const std::string& status) {
 }
 
 void MemoryManager::deallocateOldest() {
-    
     int highest = 0;
     int oldestProcess = 0;
 
@@ -169,9 +186,12 @@ void MemoryManager::deallocateOldest() {
             oldestProcess = p.pid;
         }
     }
-    //std::cout << "backing store " << oldestProcess << std::endl;
-    bs.storeProcess(oldestProcess);     //backing store
-    deallocateMemory(oldestProcess);    //deallocate now
+
+    if (oldestProcess != 0) {
+        //std::cout << "backing store " << oldestProcess << std::endl;
+        bs.storeProcess(oldestProcess);     //backing store
+        deallocateMemory(oldestProcess);    //deallocate now
+    }
 }
 
 // Deallocate memory when the process finishes
@@ -192,6 +212,7 @@ void MemoryManager::deallocateMemory(int pid) {
             if (memory[i] == pid) {
                 memory[i] = -1;
                 freedMemory += frameSize;
+                numPagedIn--;
             }
         }
     }
@@ -277,7 +298,7 @@ void MemoryManager::printMemoryDetails(float cpuUtil) {
     std::cout << "Running processes and memory usage:" << std::endl;
     std::cout << "----------------------------------------------" << std::endl;
     for (const auto& p : processes) {
-        if (p.active == "running" || p.active == "idle") {
+        if (p.active == "running") {
             std::cout << p.pid << "\t" << p.memory << "MiB" << std::endl;
         }
     }
@@ -285,11 +306,35 @@ void MemoryManager::printMemoryDetails(float cpuUtil) {
 }
 
 int MemoryManager::getPagedIn() const {
+    if (memType == "flat") {
+        if (getFlatPages() == 0) {
+            return 1;
+        }
+        return 0;
+    }
     return numPagedIn;
 }
-
 int MemoryManager::getPagedOut() const {
+    if (memType == "flat") {
+        return getFlatPages();
+    }
+
     int totalFrames = maxMemory / frameSize;
     int numPagedOut = totalFrames - getPagedIn();
     return numPagedOut;
+}
+
+int MemoryManager::getFlatPages() const {
+    int count = 0;
+    int numCtr = 0;
+    for (const auto& p : processes) {
+        count++;
+        if (p.active == "removed") {
+            numCtr++;
+        }
+    }
+    if (count == numCtr) {
+        return 0;       //all processes are removed so no pages in
+    }
+    return 1;
 }

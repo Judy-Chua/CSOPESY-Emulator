@@ -35,7 +35,8 @@ void Scheduler::addProcess(std::shared_ptr<Process> process) {
 
 void Scheduler::startScheduling() {
     std::lock_guard<std::mutex> lock(queueMutex);
-    if (delaysPerExec == 0) delaysPerExec = 10;
+    if (delaysPerExec >= 0 && delaysPerExec < 100) delaysPerExec = 100;
+    if (batchFreq >= 10) batchFreq /= 10;
     stop = false;
     if (!schedulerThread.joinable()) {
         schedulerThread = std::thread(&Scheduler::schedule, this);
@@ -46,7 +47,9 @@ void Scheduler::generateProcesses() {
     if (!generateProcessThread.joinable()) {
         generateProcessThread = std::thread([this]() {
             while (!stop) {
-                generateProcess();
+                for (int i = 0; i < batchFreq; i++) {
+                    generateProcess();
+                }
                 std::this_thread::sleep_for(std::chrono::milliseconds(delaysPerExec));
             }
         });
@@ -84,67 +87,61 @@ void Scheduler::schedule() {
 
 void Scheduler::generateProcess() {
     //std::cout << "cpu now " << getActiveTicks() << " batchfreq " << batchFreq << std::endl;
-    if (getActiveTicks() % batchFreq == 0) {
-        int random = generateRandomNumber(minIns, maxIns);
-        int processMemory = generateMemory();
-        int lastPID = ConsoleManager::getInstance()->getCurrentPID() + 1;
-        string initialName = "P";
-        string newName = initialName + to_string(lastPID);
-        //std::cout << "Creating new process: " << newName << std::endl;
-        ConsoleManager::getInstance()->createProcess(newName, random, processMemory);
-        //std::cout << "console manageris done " << newName << std::endl;
-    }
+    int random = generateRandomNumber(minIns, maxIns);
+    int processMemory = generateMemory();
+    int lastPID = ConsoleManager::getInstance()->getCurrentPID() + 1;
+    string initialName = "P";
+    string newName = initialName + to_string(lastPID);
+    //std::cout << "Creating new process: " << newName << std::endl;
+    ConsoleManager::getInstance()->createProcess(newName, random, processMemory);
+    //std::cout << "console manageris done " << newName << std::endl;
 }
 
 void Scheduler::scheduleFCFS() {
+    std::unique_lock<std::mutex> lock(queueMutex);
     while (true) {
-        std::shared_ptr<Process> process = nullptr;
 
-        {
-            std::unique_lock<std::mutex> lock(queueMutex);
-            cv.wait(lock, [this] {
-                return !processQueue.empty();
-                });
+        cv.wait(lock, [this] {
+            return !processQueue.empty(); // Wait until a process is available in the queue
+            });
 
-            if (processQueue.empty()) {
+        std::shared_ptr<Process> process = processQueue.front();
+        bool assigned = false;
+
+        // Assign process to an available core but check first if it has available memory or already in memory
+        for (int coreId = 0; coreId < numCores; ++coreId) {
+            if (coreAvailable[coreId]) {                                //check if allocated
+                if (!memoryManager.isAllocated(process->getPID())) {    //check if it can be allocated
+                    if (!memoryManager.allocate(process)) {
+                        //cannot be allocated
+                        continue;
+                    }  
+                }
+                coreAvailable[coreId] = false;
+                assigned = true;
+                processQueue.pop();
+
+                if (workers[coreId].joinable()) {
+                    workers[coreId].join();
+                }
+
+                workers[coreId] = std::thread(&Scheduler::worker, this, coreId, process);
                 break;
             }
-
-            process = processQueue.front();
         }
 
-        bool assigned = false;
-        for (int coreId = 0; coreId < numCores; ++coreId) {
-            if (memoryManager.getAvailableMemory() > 0 || memoryManager.isAllocated(process->getPID())) { // has available memory
-                if (coreAvailable[coreId]) {
-                    process->setState(Process::RUNNING);
-                    process->setCoreID(coreId);
-                    coreAvailable[coreId] = false;
-
-                    processQueue.pop();
-
-                    if (workers[coreId].joinable()) {
-                        workers[coreId].join();
-                    }
-
-                    workers[coreId] = std::thread(&Scheduler::worker, this, coreId, process);
-                    assigned = true;
-                    break;
-                }
-            }                
-        }
-
-        if (!assigned) {
+        if (!assigned) { //no memory or core so go back
             processQueue.pop();
             processQueue.push(process);
-            std::unique_lock<std::mutex> lock(queueMutex);
             cv.wait(lock, [this] {
                 return std::any_of(coreAvailable.begin(), coreAvailable.end(), [](bool available) { return available; });
                 });
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
-    cv.notify_all(); // Notify all waiting threads in case of a stop
+    lock.unlock();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 
 void Scheduler::scheduleRR() {
@@ -206,6 +203,7 @@ void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
         process->setCoreID(coreId);
         int ctr = 0;
         
+        //std::cout << "working process " << process->getPID() << " cpu " << coreId << std::endl;
         // Execute process within the time slice for RR
         while (ctr < timeSlice && !process->isFinished()) {
             process->executeCommand(coreId);
@@ -215,42 +213,47 @@ void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
             //std::thread([this]() { this->generateProcess(); }).detach();
 
             if (getActiveTicks() % timeSlice == 0 && getActiveTicks() != 0) {
-                //std::cout << "cpu here is " << getActiveTicks() << std::endl;
+                
                 memoryManager.printMemoryLayout(getActiveTicks() / timeSlice);
             }
-
+            //std::cout << "executing process " << getActiveTicks() << std::endl;
             std::this_thread::sleep_for(chrono::milliseconds(delaysPerExec));
         }
-        
+        memoryManager.setStatus(process->getPID(), "idle");
         coreAvailable[coreId] = true;   //set to true now since done
         if (!process->isFinished()) {
             process->setState(Process::WAITING);
             process->setCoreID(-1);
-            memoryManager.setStatus(process->getPID(), "idle");
             processQueue.push(process);
+            //std::cout << "not ";
         }
         else {
             memoryManager.deallocateMemory(process->getPID());
         }
+        //std::cout << "done for " << process->getPID() << " cpu " << coreId << std::endl;
         cv.notify_all(); // Notify scheduler of available core
     }
 }
 
 void Scheduler::worker(int coreId, std::shared_ptr<Process> process) {
+    if (process == nullptr) {
+        return;
+    }
     if (process != nullptr && !process->getName().empty()) {
-        process->setStartTime();
+        process->setState(Process::RUNNING);
+        process->setCoreID(coreId);
 
-        memoryManager.allocate(process);
-        // Process execution
         while (!process->isFinished() && process->getState() != Process::WAITING) {
             process->executeCommand(coreId);
-            std::this_thread::sleep_for(std::chrono::duration<int>(delaysPerExec));
+            incrementTicks(1);
+
+            memoryManager.printMemoryLayout(getActiveTicks() / 5);
+            
+            std::this_thread::sleep_for(chrono::milliseconds(delaysPerExec));
         }
-
+        coreAvailable[coreId] = true;   //set to true now since done
         memoryManager.deallocateMemory(process->getPID());
-        coreAvailable[coreId] = true;
-
-        cv.notify_all();  // Notify scheduler that a core is now available
+        cv.notify_all(); 
     }
 }
 
@@ -281,7 +284,8 @@ void Scheduler::screenInfo(std::ostream& shortcut) {
     {
         //std::lock_guard<std::mutex> lock(queueMutex);
         for (const auto& process : processes) {
-            if (process->getState() != Process::FINISHED && process->getCoreID() != -1) {
+            //std::cout << "checking process " << process->getPID() << " " << process->getCommandCounter() << std::endl;
+            if (process->getState() == Process::RUNNING && process->getCoreID() != -1) {
                 shortcut << process->getName() << "\tStarted: " << process->getStartTime()
                     << "   Core: " << process->getCoreID() << "   " << process->getCommandCounter() << " / "
                     << process->getLinesOfCode() << std::endl;
@@ -344,12 +348,14 @@ void Scheduler::printProcessSMI() {
 
 void Scheduler::printVmstat() {
     //std::lock_guard<std::mutex> lock(queueMutex);
+    long long currentIdle = idleTicks;
+    long long currentActive = activeTicks;
     std::cout << makeSpaces(memoryManager.getMaxMemory()) << " K total memory" << std::endl;
     std::cout << makeSpaces(memoryManager.getUsedMemory()) << " K used memory" << std::endl;
     std::cout << makeSpaces(memoryManager.getAvailableMemory()) << " K free memory" << std::endl;
-    std::cout << makeSpacesTicks(idleTicks) << " K idle cpu ticks" << std::endl;
-    std::cout << makeSpacesTicks(activeTicks) << " K active cpu ticks" << std::endl;
-    std::cout << makeSpacesTicks(idleTicks + activeTicks) << " K total cpu ticks" << std::endl;
+    std::cout << makeSpacesTicks(currentIdle) << " K idle cpu ticks" << std::endl;
+    std::cout << makeSpacesTicks(currentActive) << " K active cpu ticks" << std::endl;
+    std::cout << makeSpacesTicks(currentIdle + currentActive) << " K total cpu ticks" << std::endl;
     std::cout << makeSpaces(memoryManager.getPagedIn()) << " K num paged in" << std::endl;
     std::cout << makeSpaces(memoryManager.getPagedOut()) << " K num paged out" << std::endl << std::endl;
 }
@@ -431,7 +437,7 @@ std::string Scheduler::makeSpacesTicks(long long input) {
 void Scheduler::startTicks() {
     while (true) {
         for (int coreId = 0; coreId < numCores; ++coreId) {
-            if (coreAvailable[coreId] == false) {
+            if (coreAvailable[coreId] == true) {
                 idleTicks++;
             }
         }

@@ -67,6 +67,7 @@ public:
 
     int getPagedIn() const;
     int getPagedOut() const;
+    int getFlatPages() const;
 
     void printMemoryDetails(float cpuUtil);
 };
