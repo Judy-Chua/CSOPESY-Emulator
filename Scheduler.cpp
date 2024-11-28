@@ -350,8 +350,8 @@ void Scheduler::printVmstat() {
     std::cout << makeSpacesTicks(idleTicks) << " K idle cpu ticks" << std::endl;
     std::cout << makeSpacesTicks(activeTicks) << " K active cpu ticks" << std::endl;
     std::cout << makeSpacesTicks(idleTicks + activeTicks) << " K total cpu ticks" << std::endl;
-    std::cout << "xxxxxxxxxx K num paged in" << std::endl;
-    std::cout << "xxxxxxxxxx K num paged out" << std::endl << std::endl;
+    std::cout << makeSpaces(memoryManager.getPagedIn()) << " K num paged in" << std::endl;
+    std::cout << makeSpaces(memoryManager.getPagedOut()) << " K num paged out" << std::endl << std::endl;
 }
 
 int Scheduler::countAvailCores() {

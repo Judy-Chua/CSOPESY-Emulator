@@ -27,6 +27,8 @@ private:
     int maxMemory = 16384;  // Total memory available (16KB)
     int frameSize = 16;     // Frame size (16 bytes)
 
+    int numPagedIn = 0;
+
     std::string memType;
 
     BackingStore bs = BackingStore();
@@ -62,6 +64,9 @@ public:
     int getMaxMemory() const;
     int getUsedMemory() const;
     float getMemoryUtil() const;
+
+    int getPagedIn() const;
+    int getPagedOut() const;
 
     void printMemoryDetails(float cpuUtil);
 };
