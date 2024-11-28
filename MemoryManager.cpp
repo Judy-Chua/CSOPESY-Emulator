@@ -91,6 +91,7 @@ bool MemoryManager::pagingAllocate(int pid, int processSize) {
                     }
                 }
 
+                numPagedIn += requiredFrames;
                 processes.push_back({ pid, processSize, "running", 1}); // Record process information
                     // Process ID, Process Size, Allocation status, time
                 return true; // Allocation successful
@@ -263,4 +264,14 @@ float MemoryManager::getMemoryUtil() const {
     int used = getUsedMemory();
     float util = float(used) / getMaxMemory() * 100;
     return util;
+}
+
+int MemoryManager::getPagedIn() const {
+    return numPagedIn;
+}
+
+int MemoryManager::getPagedOut() const {
+    int totalFrames = maxMemory / frameSize;
+    int numPagedOut = totalFrames - getPagedIn();
+    return numPagedOut;
 }

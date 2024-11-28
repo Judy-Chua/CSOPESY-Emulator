@@ -42,6 +42,7 @@ void Scheduler::startScheduling() {
 
 void Scheduler::generateProcesses() {
     if (!generateProcessThread.joinable()) {
+        std::cout << "starting generateProcessThread";
         generateProcessThread = std::thread(&Scheduler::generateProcess, this);
     }
 }
@@ -52,6 +53,7 @@ void Scheduler::stopScheduler() {
         stop = true;
     }
     if (generateProcessThread.joinable()) {
+        std::cout << "ending generateProcessThread";
         generateProcessThread.join();
     }
     cv.notify_all();
@@ -343,6 +345,16 @@ void Scheduler::printProcessSMI() {
     std::cout << "Running processes and memory usage:" << std::endl;
     std::cout << "----------------------------------------------" << std::endl;
     std::cout << "pXXXX" <<  "\t" << "xxx" << "MiB" << std::endl;
+
+    /*{
+        std::lock_guard<std::mutex> lock(queueMutex);
+        for (const auto& process : processes) {
+            if (process->getState() != Process::FINISHED && process->getCoreID() != -1) {
+                std::cout << process->getName() << "\t" << process->getMemorySize() << "MiB" << std::endl;
+            }
+        }
+    }*/
+
     std::cout << "----------------------------------------------" << std::endl << std::endl;
 }
 
@@ -351,11 +363,11 @@ void Scheduler::printVmstat() {
     std::cout << makeSpaces(memoryManager.getMaxMemory()) << " K total memory" << std::endl;
     std::cout << makeSpaces(memoryManager.getUsedMemory()) << " K used memory" << std::endl;
     std::cout << makeSpaces(memoryManager.getAvailableMemory()) << " K free memory" << std::endl;
-    std::cout << idleTicks << " K idle cpu ticks" << std::endl;
-    std::cout << activeTicks << " K active cpu ticks" << std::endl;
-    std::cout << idleTicks + activeTicks << " K total cpu ticks" << std::endl;
-    std::cout << "xxxxxxxxxx K num paged in" << std::endl;
-    std::cout << "xxxxxxxxxx K num paged out" << std::endl << std::endl;
+    std::cout << makeSpaces(idleTicks) << " K idle cpu ticks" << std::endl;
+    std::cout << makeSpaces(activeTicks) << " K active cpu ticks" << std::endl;
+    std::cout << makeSpaces(idleTicks + activeTicks) << " K total cpu ticks" << std::endl;
+    std::cout << makeSpaces(memoryManager.getPagedIn()) << " K num paged in" << std::endl;
+    std::cout << makeSpaces(memoryManager.getPagedOut()) << " K num paged out" << std::endl << std::endl;
 }
 
 int Scheduler::countAvailCores() {
