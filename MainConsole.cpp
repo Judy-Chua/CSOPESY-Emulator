@@ -212,9 +212,10 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
 
             std::cout << "Creating new screen: " << parameter << "\n" << std::endl;
 
-            int random = scheduler->generateRandomNumber();
+            int random = scheduler->generateInstructions();
+            int memory = scheduler->generateMemory();
 
-            ConsoleManager::getInstance()->createProcess(parameter, random);
+            ConsoleManager::getInstance()->createProcess(parameter, random, memory);
             ConsoleManager::getInstance()->switchConsole(parameter);
         }
         else if (mode == "-ls") {
@@ -239,6 +240,7 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
         schedulerThread = std::thread([this]() {
             try {
                 this->scheduler->generateProcesses();
+                this->scheduler->startTicksProcesses();
             }
             catch (const std::exception& e) {
                 std::cerr << "Scheduler error: " << e.what() << std::endl;

@@ -107,7 +107,7 @@ void ConsoleManager::setCursorPosition(int posX, int posY) const {
 }
 
 // Creates processes and its respective screen then adds that process to the scheduler
-void ConsoleManager::createProcess(const std::string& processName, int lines) {
+void ConsoleManager::createProcess(const std::string& processName, int lines, int memory) {
     int newPID = processes.empty() ? 1001 : processes.back()->getPID() + 1;
     currentPID = newPID;
    
@@ -120,11 +120,14 @@ void ConsoleManager::createProcess(const std::string& processName, int lines) {
     char timeStr[100]; // timestamp in timeStr
     strftime(timeStr, sizeof(timeStr), "%m/%d/%Y %I:%M:%S %p", &buf);
 
-    auto newProcess = std::make_shared<Process>(newPID, processName, lines, timeStr);
+    //std::cout << "in console manager, creating new process: " << processName << std::endl;
+
+    auto newProcess = std::make_shared<Process>(newPID, processName, lines, timeStr, memory);
     processes.push_back(newProcess);
     auto processScreen = std::make_shared<BaseScreen>(processName, newProcess);
     consoleTable[processName] = processScreen;
 
+    //std::cout << "in console manager, adding back: " << processName << std::endl;
     scheduler->addProcess(newProcess);
 }
 
@@ -134,5 +137,6 @@ void ConsoleManager::setScheduler(Scheduler* scheduler) {
 }
 
 int ConsoleManager::getCurrentPID() const {
+    //std::cout << "in console manager, get current pid: " << currentPID << std::endl;
     return currentPID;
 }
