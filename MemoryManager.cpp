@@ -70,7 +70,8 @@ bool MemoryManager::flatAllocate(int pid, int processSize) {
     if (!isAllRunning()) { // If allocation fails, reallocate by removing oldest process
         //std::cout << "deallocate process " << pid << std::endl;
         deallocateOldest();
-        flatAllocate(pid, processSize);
+        bool result = flatAllocate(pid, processSize);
+        return result;
     }
 
     //std::cout << "all processes are running " << pid << std::endl;
@@ -120,7 +121,8 @@ bool MemoryManager::pagingAllocate(int pid, int processSize) {
     // If allocation fails, reallocate by removing oldest process
     if (!isAllRunning() && freeFrames != requiredFrames) {
         deallocateOldest();
-        pagingAllocate(pid, processSize);
+        bool result = pagingAllocate(pid, processSize);
+        return result;
     }
     return false;
 }
