@@ -114,7 +114,7 @@ Config readConfig(const std::string& filename) {
             config.maxIns = nValue;  
         } else if (line.find("delay-per-exec") != std::string::npos) {
             iss >> key >> fValue;
-            config.delayPerExec = fValue;  
+            config.delayPerExec = fValue;
         } else if (line.find("max-overall-mem") != std::string::npos) {
             iss >> key >> nValue;
             config.maxOverallMem = nValue;
@@ -140,7 +140,7 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
 
         if (scheduler == nullptr) {
             scheduler = new Scheduler(config.numCpu, config.scheduler, config.quantumCycles,
-                config.batchProcessFreq, config.minIns, config.maxIns, config.delayPerExec,
+                ceil(config.batchProcessFreq), config.minIns, config.maxIns, ceil(config.delayPerExec),
                 config.maxOverallMem, config.memPerFrame, config.minMemPerProc, config.maxMemPerProc);
             scheduler->startScheduling();
             ConsoleManager::getInstance()->setScheduler(scheduler);
