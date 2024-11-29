@@ -63,6 +63,7 @@ private:
     std::vector<std::thread> workers;
     std::mutex queueMutex;
     std::mutex cpuMutex;
+    std::mutex stateMutex;
     std::condition_variable cv;
     bool stop = false;
     bool stopPrinting = false;

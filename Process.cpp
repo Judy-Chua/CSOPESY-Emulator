@@ -37,10 +37,12 @@ int Process::getLinesOfCode() const {
 }
 
 void Process::setState(ProcessState newState) {
+    std::lock_guard<std::mutex> lock(stateMutex);
     currentState = newState;
 }
 
 Process::ProcessState Process::getState() const {
+    std::lock_guard<std::mutex> lock(stateMutex);
     return currentState;
 }
 
