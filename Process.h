@@ -28,7 +28,6 @@ public:
 	void setCoreID(int coreID);
 	void executeCommand(int coreID);
 	mutable std::mutex processMutex;
-	mutable std::mutex stateMutex;
 
 private:
 	int pid;

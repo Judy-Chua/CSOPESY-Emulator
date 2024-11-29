@@ -13,7 +13,7 @@
 
 using namespace std;
 
-Scheduler::Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay, int memMax, int memFrame, int minMemProc, int maxMemProc) :
+Scheduler::Scheduler(int numCores, const std::string& type, int timeSlice, float freq, int min, int max, float delay, int memMax, int memFrame, int minMemProc, int maxMemProc) :
     numCores(numCores), type(type), coreAvailable(numCores, true), workers(numCores),
     timeSlice(timeSlice), batchFreq(freq), minIns(min), maxIns(max), delaysPerExec(delay),
     maxOverallMem(memMax), memPerFrame(memFrame), minMemPerProc(minMemProc), maxMemPerProc(maxMemProc),
@@ -35,8 +35,7 @@ void Scheduler::addProcess(std::shared_ptr<Process> process) {
 
 void Scheduler::startScheduling() {
     std::lock_guard<std::mutex> lock(queueMutex);
-    if (delaysPerExec >= 0 && delaysPerExec < 100) delaysPerExec = 100;
-    if (batchFreq >= 10) batchFreq /= 10;
+    if (delaysPerExec >= 0 && delaysPerExec < 50) delaysPerExec = 50;
     stop = false;
     if (!schedulerThread.joinable()) {
         schedulerThread = std::thread(&Scheduler::schedule, this);
@@ -105,41 +104,39 @@ void Scheduler::scheduleFCFS() {
             return !processQueue.empty(); // Wait until a process is available in the queue
             });
 
-        if (!processQueue.empty()) {
-            std::shared_ptr<Process> process = processQueue.front();
-            bool assigned = false;
+        std::shared_ptr<Process> process = processQueue.front();
+        bool assigned = false;
 
-            // Assign process to an available core but check first if it has available memory or already in memory
-            for (int coreId = 0; coreId < numCores; ++coreId) {
-                if (coreAvailable[coreId]) {                                //check if allocated
-                    if (!memoryManager.isAllocated(process->getPID())) {    //check if it can be allocated
-                        if (!memoryManager.allocate(process)) {
-                            //cannot be allocated
-                            continue;
-                        }
-                    }
-                    coreAvailable[coreId] = false;
-                    assigned = true;
-                    processQueue.pop();
-
-                    if (workers[coreId].joinable()) {
-                        workers[coreId].join();
-                    }
-
-                    workers[coreId] = std::thread(&Scheduler::worker, this, coreId, process);
-                    break;
+        // Assign process to an available core but check first if it has available memory or already in memory
+        for (int coreId = 0; coreId < numCores; ++coreId) {
+            if (coreAvailable[coreId]) {                                //check if allocated
+                if (!memoryManager.isAllocated(process->getPID())) {    //check if it can be allocated
+                    if (!memoryManager.allocate(process)) {
+                        //cannot be allocated
+                        continue;
+                    }  
                 }
-            }
-
-            if (!assigned) { //no memory or core so go back
+                coreAvailable[coreId] = false;
+                assigned = true;
                 processQueue.pop();
-                processQueue.push(process);
-                cv.wait(lock, [this] {
-                    return std::any_of(coreAvailable.begin(), coreAvailable.end(), [](bool available) { return available; });
-                    });
+
+                if (workers[coreId].joinable()) {
+                    workers[coreId].join();
+                }
+
+                workers[coreId] = std::thread(&Scheduler::worker, this, coreId, process);
+                break;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
+
+        if (!assigned) { //no memory or core so go back
+            processQueue.pop();
+            processQueue.push(process);
+            cv.wait(lock, [this] {
+                return std::any_of(coreAvailable.begin(), coreAvailable.end(), [](bool available) { return available; });
+                });
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     lock.unlock();
@@ -154,43 +151,41 @@ void Scheduler::scheduleRR() {
             return !processQueue.empty(); // Wait until a process is available in the queue
             });
 
-        if (!processQueue.empty()) {
-            std::shared_ptr<Process> process = processQueue.front();
-            bool assigned = false;
+        std::shared_ptr<Process> process = processQueue.front();
+        bool assigned = false;
 
-            // Assign process to an available core but check first if it has available memory or already in memory
-            for (int coreId = 0; coreId < numCores; ++coreId) {
-                if (coreAvailable[coreId]) {                                //check if allocated
-                    if (!memoryManager.isAllocated(process->getPID())) {    //check if it can be allocated
-                        if (!memoryManager.allocate(process)) {
-                            //cannot be allocated
-                            continue;
-                        }
-                        //std::cout << "***Allocated " << process->getPID() << std::endl;  
+        // Assign process to an available core but check first if it has available memory or already in memory
+        for (int coreId = 0; coreId < numCores; ++coreId) {
+            if (coreAvailable[coreId]) {                                //check if allocated
+                if (!memoryManager.isAllocated(process->getPID())) {    //check if it can be allocated
+                    if (!memoryManager.allocate(process)) {
+                        //cannot be allocated
+                        continue;
                     }
-                    //std::cout << "Assigning to Core " << coreId << " for process " << process->getPID() << std::endl << std::endl;
-                    coreAvailable[coreId] = false;
-                    assigned = true;
-                    processQueue.pop();
-
-                    if (workers[coreId].joinable()) {
-                        workers[coreId].join();
-                    }
-
-                    workers[coreId] = std::thread(&Scheduler::workerRR, this, coreId, process);
-                    break;
+                    //std::cout << "***Allocated " << process->getPID() << std::endl;  
                 }
-            }
-
-            if (!assigned) { //no memory or core so go back
+                //std::cout << "Assigning to Core " << coreId << " for process " << process->getPID() << std::endl << std::endl;
+                coreAvailable[coreId] = false;
+                assigned = true;
                 processQueue.pop();
-                processQueue.push(process);
-                cv.wait(lock, [this] {
-                    return std::any_of(coreAvailable.begin(), coreAvailable.end(), [](bool available) { return available; });
-                    });
+
+                if (workers[coreId].joinable()) {
+                    workers[coreId].join();
+                }
+
+                workers[coreId] = std::thread(&Scheduler::workerRR, this, coreId, process);
+                break;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
+
+        if (!assigned) { //no memory or core so go back
+            processQueue.pop();
+            processQueue.push(process);
+            cv.wait(lock, [this] {
+                return std::any_of(coreAvailable.begin(), coreAvailable.end(), [](bool available) { return available; });
+                });
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     lock.unlock();
@@ -203,7 +198,6 @@ void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
         return;
     }
     if (process != nullptr && !process->getName().empty()) {
-        std::lock_guard<std::mutex> lock(stateMutex);
         process->setState(Process::RUNNING);
         process->setCoreID(coreId);
         int ctr = 0;
@@ -216,16 +210,18 @@ void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
             incrementTicks(1);
 
             //std::thread([this]() { this->generateProcess(); }).detach();
-
+            /*
             if (getActiveTicks() % timeSlice == 0 && getActiveTicks() != 0) {
                 
                 memoryManager.printMemoryLayout(getActiveTicks() / timeSlice);
             }
+            */
             //std::cout << "executing process " << getActiveTicks() << std::endl;
             std::this_thread::sleep_for(chrono::milliseconds(delaysPerExec));
         }
         memoryManager.setStatus(process->getPID(), "idle");
         coreAvailable[coreId] = true;   //set to true now since done
+
         if (!process->isFinished()) {
             process->setState(Process::WAITING);
             process->setCoreID(-1);
@@ -245,15 +241,12 @@ void Scheduler::worker(int coreId, std::shared_ptr<Process> process) {
         return;
     }
     if (process != nullptr && !process->getName().empty()) {
-        std::lock_guard<std::mutex> lock(stateMutex);
         process->setState(Process::RUNNING);
         process->setCoreID(coreId);
 
         while (!process->isFinished() && process->getState() != Process::WAITING) {
             process->executeCommand(coreId);
             incrementTicks(1);
-
-            memoryManager.printMemoryLayout(getActiveTicks() / 5);
             
             std::this_thread::sleep_for(chrono::milliseconds(delaysPerExec));
         }
@@ -289,7 +282,6 @@ void Scheduler::screenInfo(std::ostream& shortcut) {
 
     {
         //std::lock_guard<std::mutex> lock(queueMutex);
-        //std::lock_guard<std::mutex> lock(stateMutex);
         for (const auto& process : processes) {
             //std::cout << "checking process " << process->getPID() << " " << process->getCommandCounter() << std::endl;
             if (process->getState() == Process::RUNNING && process->getCoreID() != -1) {
