@@ -322,11 +322,11 @@ void Scheduler::printVmstat() {
     std::cout << makeSpaces(memoryManager.getMaxMemory()) << " K total memory" << std::endl;
     std::cout << makeSpaces(memoryManager.getUsedMemory()) << " K used memory" << std::endl;
     std::cout << makeSpaces(memoryManager.getAvailableMemory()) << " K free memory" << std::endl;
-    std::cout << makeSpacesTicks(currentIdle) << " K idle cpu ticks" << std::endl;
-    std::cout << makeSpacesTicks(currentActive) << " K active cpu ticks" << std::endl;
-    std::cout << makeSpacesTicks(currentIdle + currentActive) << " K total cpu ticks" << std::endl;
-    std::cout << makeSpaces(memoryManager.getPagedIn()) << " K num paged in" << std::endl;
-    std::cout << makeSpaces(memoryManager.getPagedOut()) << " K num paged out" << std::endl << std::endl;
+    std::cout << makeSpacesTicks(currentIdle) << " idle cpu ticks" << std::endl;
+    std::cout << makeSpacesTicks(currentActive) << " active cpu ticks" << std::endl;
+    std::cout << makeSpacesTicks(currentIdle + currentActive) << " total cpu ticks" << std::endl;
+    std::cout << makeSpaces(memoryManager.getPagedIn()) << " num paged in" << std::endl;
+    std::cout << makeSpaces(memoryManager.getPagedOut()) << " num paged out" << std::endl << std::endl;
 }
 
 int Scheduler::countAvailCores() {

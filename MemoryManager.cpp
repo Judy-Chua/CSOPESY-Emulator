@@ -258,14 +258,14 @@ void MemoryManager::printMemoryDetails(float cpuUtil) {
     std::cout << "| PROCESS-SMI v01.00   Driver Version: 01.00 |" << std::endl;
     std::cout << "----------------------------------------------" << std::endl;
     std::cout << "CPU-Util: " << cpuUtil << "%" << std::endl;
-    std::cout << "Memory Usage: " << getUsedMemory() << "MiB / " << getMaxMemory() << "MiB" << std::endl;
+    std::cout << "Memory Usage: " << getUsedMemory() << "kB / " << getMaxMemory() << "kB" << std::endl;
     std::cout << "Memory Util: " << getMemoryUtil() << "%" << std::endl << std::endl;
     std::cout << "==============================================" << std::endl;
     std::cout << "Running processes and memory usage:" << std::endl;
     std::cout << "----------------------------------------------" << std::endl;
     for (const auto& p : processes) {
         if (p.active == "running" || p.active == "idle") {
-            std::cout << p.pid << "\t" << p.memory << "MiB" << std::endl;
+            std::cout << p.pid << "\t" << p.memory << "kB" << std::endl;
         }
     }
     std::cout << "----------------------------------------------" << std::endl << std::endl;
