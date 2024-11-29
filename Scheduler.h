@@ -12,7 +12,7 @@
 
 class Scheduler {
 public:
-    Scheduler(int numCores, const std::string& type, int timeSlice, float freq, int min, int max, float delay, int memMax, int memFrame, int minMemProc, int maxMemProc);
+    Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay, int memMax, int memFrame, int minMemProc, int maxMemProc);
     void addProcess(std::shared_ptr<Process> process);
     void startScheduling();
     void generateProcesses();
@@ -45,6 +45,8 @@ public:
     long long getIdleTicks();
     void incrementIdleTicks(long long ticks);
 
+    void logCycleData(int cycle);
+
 private:
     void schedule();
     void generateProcess();
@@ -70,10 +72,15 @@ private:
     std::string type;
     std::vector<bool> coreAvailable;
 
+    //std::atomic<long long> activeTicks{ 0 };
+    //std::atomic<long long> idleTicks{ 0 };
     int numCores;
     int timeSlice = 0;
     int minIns, maxIns, batchFreq, delaysPerExec;
     int maxOverallMem, memPerFrame, minMemPerProc, maxMemPerProc;
+    int cycle = 0;
+    void printProcessQueue();
+    void printRunningProcesses();
 
     long long activeTicks, idleTicks;
 };

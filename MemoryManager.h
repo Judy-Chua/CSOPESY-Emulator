@@ -28,7 +28,6 @@ private:
     int frameSize = 16;     // Frame size (16 bytes)
 
     int numPagedIn = 0;
-    int numPagedOut = 0;
 
     std::string memType;
 
@@ -68,6 +67,7 @@ public:
 
     int getPagedIn() const;
     int getPagedOut() const;
+    int getFlatPages() const;
 
     void printMemoryDetails(float cpuUtil);
 };
