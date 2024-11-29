@@ -36,21 +36,23 @@ bool MemoryManager::allocate(std::shared_ptr<Process> process) {
     bs.addProcess(process, process->getPID());
 
     if (memType == "flat") {
+        
         return flatAllocate(process->getPID(), process->getMemorySize());
     }
+    
     return pagingAllocate(process->getPID(), process->getMemorySize());
 }
 
 // First-fit memory allocation
 bool MemoryManager::flatAllocate(int pid, int processSize) {
     if (isAllocatedIdle(pid)) {
-        //std::cout << "already allocated process and idle " << pid << std::endl;
+        std::cout << "already allocated process and idle " << pid << std::endl;
         setStatus(pid, "running");
         return true;
     }
     
     if (availableMemory >= processSize) {
-        //std::cout << "Allocating process since free " << pid << std::endl;
+        std::cout << "Allocating process since free " << pid << std::endl;
         bool existing = false;
         for (auto& p : processes) {
             if (p.pid == pid && p.active == "removed") {
@@ -113,7 +115,7 @@ bool MemoryManager::pagingAllocate(int pid, int processSize) {
                     // Process ID, Process Size, Allocation status, time
                 return true; // Allocation successful
             }
-            //std::cout << "total now " << i << std::endl;
+            //std::cout << i << ", ";
         }
     }
 
@@ -188,7 +190,7 @@ void MemoryManager::deallocateOldest() {
     }
 
     if (oldestProcess != 0) {
-        //std::cout << "backing store " << oldestProcess << std::endl;
+        //std::cout << "Putting P" << oldestProcess << " to backing store " << std::endl;
         bs.storeProcess(oldestProcess);     //backing store
         deallocateMemory(oldestProcess);    //deallocate now
     }
@@ -338,3 +340,4 @@ int MemoryManager::getFlatPages() const {
     }
     return 1;
 }
+

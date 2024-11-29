@@ -45,6 +45,8 @@ public:
     long long getIdleTicks();
     void incrementIdleTicks(long long ticks);
 
+    void logCycleData(int cycle);
+
 private:
     void schedule();
     void generateProcess();
@@ -76,6 +78,9 @@ private:
     int timeSlice = 0;
     int minIns, maxIns, batchFreq, delaysPerExec;
     int maxOverallMem, memPerFrame, minMemPerProc, maxMemPerProc;
+    int cycle = 0;
+    void printProcessQueue();
+    void printRunningProcesses();
 
     long long activeTicks, idleTicks;
 };
