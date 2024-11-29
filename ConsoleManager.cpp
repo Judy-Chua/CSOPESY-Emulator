@@ -120,14 +120,11 @@ void ConsoleManager::createProcess(const std::string& processName, int lines, in
     char timeStr[100]; // timestamp in timeStr
     strftime(timeStr, sizeof(timeStr), "%m/%d/%Y %I:%M:%S %p", &buf);
 
-    //std::cout << "in console manager, creating new process: " << processName << std::endl;
-
     auto newProcess = std::make_shared<Process>(newPID, processName, lines, timeStr, memory);
     processes.push_back(newProcess);
     auto processScreen = std::make_shared<BaseScreen>(processName, newProcess);
     consoleTable[processName] = processScreen;
 
-    //std::cout << "in console manager, adding back: " << processName << std::endl;
     scheduler->addProcess(newProcess);
 }
 

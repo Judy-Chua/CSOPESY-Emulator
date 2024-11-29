@@ -39,13 +39,6 @@ private:
     void deallocateOldest();
     bool isAllRunning();
 
-    /*
-    mutable std::mutex memoryMutex; // Protects memory and processes
-    std::mutex backingStoreMutex;         // Protects interactions with BackingStore
-    std::condition_variable_any cv;       // For signaling threads
-    std::atomic<bool> stopThreads{ false };
-    */
-
 public:
     MemoryManager(int maxMemory, int frameSize, int availableMemory);
     bool allocate(std::shared_ptr<Process> process);
@@ -55,12 +48,8 @@ public:
 
     void setStatus(int pid, const std::string& status);
 
-    int getActiveProcessesCount() const;
     int getAvailableMemory() const;
     void setAvailableMemory(int free);
-
-    void printMemoryLayout(int cycle) const;
-    std::string getCurrentTime() const;
 
     int getMaxMemory() const;
     int getUsedMemory() const;

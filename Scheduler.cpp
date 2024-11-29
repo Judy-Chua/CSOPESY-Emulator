@@ -13,24 +13,17 @@
 
 using namespace std;
 
-Scheduler::Scheduler(int numCores, const std::string& type, int timeSlice, float freq, int min, int max, float delay, int memMax, int memFrame, int minMemProc, int maxMemProc) :
+Scheduler::Scheduler(int numCores, const std::string& type, int timeSlice, int freq, int min, int max, int delay, int memMax, int memFrame, int minMemProc, int maxMemProc) :
     numCores(numCores), type(type), coreAvailable(numCores, true), workers(numCores),
     timeSlice(timeSlice), batchFreq(freq), minIns(min), maxIns(max), delaysPerExec(delay),
     maxOverallMem(memMax), memPerFrame(memFrame), minMemPerProc(minMemProc), maxMemPerProc(maxMemProc),
     memoryManager(memMax, memFrame, memMax), activeTicks(0), idleTicks(0) {}
 
 void Scheduler::addProcess(std::shared_ptr<Process> process) {  
-    //std::cout << "in add process " << process->getPID() << std::endl;
-    //std::lock_guard<std::mutex> lock(queueMutex);
-    //std::cout << "no more locking " << process->getName() << std::endl;
     process->setState(Process::READY); //set to READY first
-    //std::cout << "set state " << process->getName() << std::endl;
     processes.push_back(process);
-    //std::cout << "Process added to list: " << process->getName() << std::endl;
     processQueue.push(process);
-    //std::cout << "Process added to queue: " << process->getName() << std::endl;
     cv.notify_all();
-    //std::cout << "notified. done " << process->getName() << std::endl;
 }
 
 void Scheduler::startScheduling() {
@@ -63,7 +56,6 @@ void Scheduler::startTicksProcesses() {
 
 void Scheduler::stopScheduler() {
     {
-        //std::lock_guard<std::mutex> lock(queueMutex);
         stop = true;
     }
     if (generateProcessThread.joinable()) {
@@ -85,15 +77,12 @@ void Scheduler::schedule() {
 }
 
 void Scheduler::generateProcess() {
-    //std::cout << "cpu now " << getActiveTicks() << " batchfreq " << batchFreq << std::endl;
     int random = generateRandomNumber(minIns, maxIns);
     int processMemory = generateMemory();
     int lastPID = ConsoleManager::getInstance()->getCurrentPID() + 1;
     string initialName = "P";
     string newName = initialName + to_string(lastPID);
-    //std::cout << "Creating new process: " << newName << std::endl;
     ConsoleManager::getInstance()->createProcess(newName, random, processMemory);
-    //std::cout << "console manageris done " << newName << std::endl;
 }
 
 void Scheduler::scheduleFCFS() {
@@ -161,10 +150,8 @@ void Scheduler::scheduleRR() {
                     if (!memoryManager.allocate(process)) {
                         //cannot be allocated
                         continue;
-                    }
-                    //std::cout << "***Allocated " << process->getPID() << std::endl;  
+                    }  
                 }
-                //std::cout << "Assigning to Core " << coreId << " for process " << process->getPID() << std::endl << std::endl;
                 coreAvailable[coreId] = false;
                 assigned = true;
                 processQueue.pop();
@@ -202,21 +189,11 @@ void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
         process->setCoreID(coreId);
         int ctr = 0;
         
-        //std::cout << "working process " << process->getPID() << " cpu " << coreId << std::endl;
         // Execute process within the time slice for RR
         while (ctr < timeSlice && !process->isFinished()) {
             process->executeCommand(coreId);
             ctr++;
             incrementTicks(1);
-
-            //std::thread([this]() { this->generateProcess(); }).detach();
-            /*
-            if (getActiveTicks() % timeSlice == 0 && getActiveTicks() != 0) {
-                
-                memoryManager.printMemoryLayout(getActiveTicks() / timeSlice);
-            }
-            */
-            //std::cout << "executing process " << getActiveTicks() << std::endl;
             std::this_thread::sleep_for(chrono::milliseconds(delaysPerExec));
         }
         memoryManager.setStatus(process->getPID(), "idle");
@@ -226,12 +203,10 @@ void Scheduler::workerRR(int coreId, std::shared_ptr<Process> process) {
             process->setState(Process::WAITING);
             process->setCoreID(-1);
             processQueue.push(process);
-            //std::cout << "not ";
         }
         else {
             memoryManager.deallocateMemory(process->getPID());
         }
-        //std::cout << "done for " << process->getPID() << " cpu " << coreId << std::endl;
         cv.notify_all(); // Notify scheduler of available core
     }
 }
@@ -273,7 +248,6 @@ void Scheduler::reportUtil() {
 
 void Scheduler::screenInfo(std::ostream& shortcut) {
     int runCtr = 0, finCtr = 0;
-    //std::cout << "inside screenInfo to call getCpuUtilization " << std::endl;
     shortcut << "CPU Utilization: " << getCpuUtilization() << "%" << std::endl;
     shortcut << "Cores used: " << getUsedCores() << std::endl;
     shortcut << "Cores available: " << countAvailCores() << std::endl << std::endl;
@@ -281,9 +255,7 @@ void Scheduler::screenInfo(std::ostream& shortcut) {
     shortcut << "Running processes:\n";
 
     {
-        //std::lock_guard<std::mutex> lock(queueMutex);
         for (const auto& process : processes) {
-            //std::cout << "checking process " << process->getPID() << " " << process->getCommandCounter() << std::endl;
             if (process->getState() == Process::RUNNING && process->getCoreID() != -1) {
                 shortcut << process->getName() << "\tStarted: " << process->getStartTime()
                     << "   Core: " << process->getCoreID() << "   " << process->getCommandCounter() << " / "
@@ -299,7 +271,6 @@ void Scheduler::screenInfo(std::ostream& shortcut) {
     shortcut << "\nFinished processes:\n";
 
     {
-        //std::lock_guard<std::mutex> lock(queueMutex);
         for (const auto& process : processes) {
             std::lock_guard<std::mutex> processLock(process->processMutex);
             if (process->getState() == Process::FINISHED) {
@@ -346,7 +317,6 @@ void Scheduler::printProcessSMI() {
 }
 
 void Scheduler::printVmstat() {
-    //std::lock_guard<std::mutex> lock(queueMutex);
     long long currentIdle = idleTicks;
     long long currentActive = activeTicks;
     std::cout << makeSpaces(memoryManager.getMaxMemory()) << " K total memory" << std::endl;
@@ -360,27 +330,19 @@ void Scheduler::printVmstat() {
 }
 
 int Scheduler::countAvailCores() {
-    //std::cout << "inside countAvailCores " << std::endl;
     int count = 0;
     if (type == "rr") {
-        //std::cout << "rr " << std::endl;
-        // count = 0;
         {
-            //std::lock_guard<std::mutex> lock(queueMutex);
-            //std::cout << "not locking then looping cores " << std::endl;
             for (int coreId = 0; coreId < numCores; ++coreId) {
-                //std::cout << "checking core " << coreId << std::endl;
                 if (coreAvailable[coreId]) { // Check if core is marked as available
                     count++;
                 }
             }
-            //std::cout << "final count " << count << std::endl;
         }
     }
     else { // fcfs
         count = numCores;
         {
-            //std::lock_guard<std::mutex> lock(queueMutex);
             for (const auto& process : processes) { //more updated version instead of checking coresAvailable
                 if (process->getState() == Process::RUNNING && process->getCoreID() != -1) {
                     count--;
@@ -392,20 +354,14 @@ int Scheduler::countAvailCores() {
 }
 
 int Scheduler::getUsedCores() {
-    //std::cout << "inside getUsedCores to call countAvailCores " << std::endl;
     int avail = countAvailCores();
-    //std::cout << "got the available cores " << avail << std::endl;
     int used = numCores - avail;
-    //std::cout << "returning used " << used << std::endl;
     return used;
 }
 
 float Scheduler::getCpuUtilization() {
-    //std::cout << "inside getCpuUtilization to call getUsedCores " << std::endl;
     auto used = getUsedCores();
-    //std::cout << "got the used cores " << used << std::endl;
     float percent = float(used) / numCores * 100;
-    //std::cout << "returning percent " << percent << std::endl;
     return percent;
 }
 

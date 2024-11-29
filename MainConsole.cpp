@@ -68,10 +68,10 @@ struct Config {
     int numCpu = 4;
     std::string scheduler = "rr";
     int quantumCycles = 5;
-    float batchProcessFreq = 1;
+    int batchProcessFreq = 1;
     int minIns = 1000;
     int maxIns = 2000;
-    float delayPerExec = 0;
+    int delayPerExec = 0;
     int maxOverallMem = 2;
     int memPerFrame = 2;
     int minMemPerProc = 2;
@@ -91,42 +91,41 @@ Config readConfig(const std::string& filename) {
     while (std::getline(file, line)) {
         std::istringstream iss(line);
         std::string key;
-        int nValue;
-        float fValue;
+        int value;
 
         if (line.find("num-cpu") != std::string::npos) {
-            iss >> key >> nValue;
-            config.numCpu = nValue;
+            iss >> key >> value;
+            config.numCpu = value;  
         } else if (line.find("scheduler") != std::string::npos) {
             iss >> key >> config.scheduler;
             config.scheduler = config.scheduler.substr(1, config.scheduler.length() - 2);
         } else if (line.find("quantum-cycles") != std::string::npos) {
-            iss >> key >> nValue;
-            config.quantumCycles = nValue;  
+            iss >> key >> value;
+            config.quantumCycles = value;  
         }  else if (line.find("batch-process-freq") != std::string::npos) {
-            iss >> key >> fValue;
-            config.batchProcessFreq = fValue;  
+            iss >> key >> value;
+            config.batchProcessFreq = value;  
         } else if (line.find("min-ins") != std::string::npos) {
-            iss >> key >> nValue;
-            config.minIns = nValue;  
+            iss >> key >> value;
+            config.minIns = value;  
         } else if (line.find("max-ins") != std::string::npos) {
-            iss >> key >> nValue;
-            config.maxIns = nValue;  
+            iss >> key >> value;
+            config.maxIns = value;  
         } else if (line.find("delay-per-exec") != std::string::npos) {
-            iss >> key >> fValue;
-            config.delayPerExec = fValue;
+            iss >> key >> value;
+            config.delayPerExec = value;  
         } else if (line.find("max-overall-mem") != std::string::npos) {
-            iss >> key >> nValue;
-            config.maxOverallMem = nValue;
+            iss >> key >> value;
+            config.maxOverallMem = value;
         } else if (line.find("mem-per-frame") != std::string::npos) {
-            iss >> key >> nValue;
-            config.memPerFrame = nValue;
+            iss >> key >> value;
+            config.memPerFrame = value;
         } else if (line.find("min-mem-per-proc") != std::string::npos) {
-            iss >> key >> nValue;
-            config.minMemPerProc = nValue;
+            iss >> key >> value;
+            config.minMemPerProc = value;
         } else if (line.find("max-mem-per-proc") != std::string::npos) {
-            iss >> key >> nValue;
-            config.maxMemPerProc = nValue;
+            iss >> key >> value;
+            config.maxMemPerProc = value;
         }
     }
 
@@ -140,7 +139,7 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
 
         if (scheduler == nullptr) {
             scheduler = new Scheduler(config.numCpu, config.scheduler, config.quantumCycles,
-                ceil(config.batchProcessFreq), config.minIns, config.maxIns, ceil(config.delayPerExec),
+                config.batchProcessFreq, config.minIns, config.maxIns, config.delayPerExec,
                 config.maxOverallMem, config.memPerFrame, config.minMemPerProc, config.maxMemPerProc);
             scheduler->startScheduling();
             ConsoleManager::getInstance()->setScheduler(scheduler);
@@ -156,9 +155,9 @@ void MainConsole::executeCommand(Command command, const std::string& userInput){
             std::cout << "   Number of CPUs                - " << config.numCpu << std::endl;
             std::cout << "   Scheduler                     - " << sched << std::endl;
             std::cout << "   Quantum Cycles                - " << config.quantumCycles << std::endl;
-            std::cout << "   Frequency of Adding Processes - " << std::fixed << std::setprecision(2) << config.batchProcessFreq << std::endl;
+            std::cout << "   Frequency of Adding Processes - " << config.batchProcessFreq << std::endl;
             std::cout << "   Range of Instructions         - " << config.minIns << "-" << config.maxIns << std::endl;
-            std::cout << "   Delay per Execution           - " << std::fixed << std::setprecision(2) << config.delayPerExec << std::endl << std::endl;
+            std::cout << "   Delay per Execution           - " << config.delayPerExec << std::endl << std::endl;
 
             std::cout << "Memory settings set to:" << std::endl;
             std::cout << "   Maximum Memory Available      - " << config.maxOverallMem << std::endl;
