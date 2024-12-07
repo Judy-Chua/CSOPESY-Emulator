@@ -251,12 +251,6 @@ void Scheduler::screenInfo(std::ostream& shortcut) {
     shortcut << "CPU Utilization: " << getCpuUtilization() << "%" << std::endl;
     shortcut << "Cores used: " << getUsedCores() << std::endl;
     shortcut << "Cores available: " << countAvailCores() << std::endl << std::endl;
-    int used = getUsedCores();
-    int avail = countAvailCores();
-    float util = float(used) / numCores * 100;
-    shortcut << "CPU Utilization: " << util << "%" << std::endl;
-    shortcut << "Cores used: " << used << std::endl;
-    shortcut << "Cores available: " << avail << std::endl << std::endl;
     shortcut << "--------------------------------------------------\n";
     shortcut << "Running processes:\n";
 
