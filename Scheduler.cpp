@@ -251,6 +251,12 @@ void Scheduler::screenInfo(std::ostream& shortcut) {
     shortcut << "CPU Utilization: " << getCpuUtilization() << "%" << std::endl;
     shortcut << "Cores used: " << getUsedCores() << std::endl;
     shortcut << "Cores available: " << countAvailCores() << std::endl << std::endl;
+    int used = getUsedCores();
+    int avail = countAvailCores();
+    float util = float(used) / numCores * 100;
+    shortcut << "CPU Utilization: " << util << "%" << std::endl;
+    shortcut << "Cores used: " << used << std::endl;
+    shortcut << "Cores available: " << avail << std::endl << std::endl;
     shortcut << "--------------------------------------------------\n";
     shortcut << "Running processes:\n";
 
@@ -319,9 +325,9 @@ void Scheduler::printProcessSMI() {
 void Scheduler::printVmstat() {
     long long currentIdle = idleTicks;
     long long currentActive = activeTicks;
-    std::cout << makeSpaces(memoryManager.getMaxMemory()) << " K total memory" << std::endl;
-    std::cout << makeSpaces(memoryManager.getUsedMemory()) << " K used memory" << std::endl;
-    std::cout << makeSpaces(memoryManager.getAvailableMemory()) << " K free memory" << std::endl;
+    std::cout << makeSpaces(memoryManager.getMaxMemory()) << " KB total memory" << std::endl;
+    std::cout << makeSpaces(memoryManager.getUsedMemory()) << " KB used memory" << std::endl;
+    std::cout << makeSpaces(memoryManager.getAvailableMemory()) << " KB free memory" << std::endl;
     std::cout << makeSpacesTicks(currentIdle) << " idle cpu ticks" << std::endl;
     std::cout << makeSpacesTicks(currentActive) << " active cpu ticks" << std::endl;
     std::cout << makeSpacesTicks(currentIdle + currentActive) << " total cpu ticks" << std::endl;

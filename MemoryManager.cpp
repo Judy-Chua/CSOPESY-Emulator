@@ -81,7 +81,6 @@ bool MemoryManager::pagingAllocate(int pid, int processSize) {
     std::vector<int> listOfFrames;
 
     if (isAllocatedIdle(pid)) {
-        std::cout << "already allocated process and idle " << pid << std::endl;
         setStatus(pid, "running");
         return true;
     }
@@ -258,14 +257,14 @@ void MemoryManager::printMemoryDetails(float cpuUtil) {
     std::cout << "| PROCESS-SMI v01.00   Driver Version: 01.00 |" << std::endl;
     std::cout << "----------------------------------------------" << std::endl;
     std::cout << "CPU-Util: " << cpuUtil << "%" << std::endl;
-    std::cout << "Memory Usage: " << getUsedMemory() << "kB / " << getMaxMemory() << "kB" << std::endl;
+    std::cout << "Memory Usage: " << getUsedMemory() << "KB / " << getMaxMemory() << "KB" << std::endl;
     std::cout << "Memory Util: " << getMemoryUtil() << "%" << std::endl << std::endl;
     std::cout << "==============================================" << std::endl;
     std::cout << "Running processes and memory usage:" << std::endl;
     std::cout << "----------------------------------------------" << std::endl;
     for (const auto& p : processes) {
         if (p.active == "running" || p.active == "idle") {
-            std::cout << p.pid << "\t" << p.memory << "kB" << std::endl;
+            std::cout << p.pid << "\t" << p.memory << "KB" << std::endl;
         }
     }
     std::cout << "----------------------------------------------" << std::endl << std::endl;
